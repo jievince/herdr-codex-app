@@ -1,0 +1,22 @@
+id = "jievince.herdr-codex-app"
+name = "Herdr Codex App"
+version = "0.1.3"
+min_herdr_version = "0.7.5"
+description = "Browse and resume Codex chats as native Herdr workspaces and tabs."
+platforms = ["linux"]
+
+[[build]]
+command = ["node", "scripts/preflight.mjs"]
+
+[[startup]]
+command = ["node", "src/sync.mjs"]
+
+[[actions]]
+id = "sync"
+title = "Refresh Codex chats"
+contexts = ["global", "workspace"]
+command = ["node", "src/sync.mjs"]
+
+[[events]]
+on = "pane.focused"
+command = ["node", "src/focus.mjs"]

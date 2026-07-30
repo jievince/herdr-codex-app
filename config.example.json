@@ -1,0 +1,7 @@
+{
+  "maxIndexedChats": 40,
+  "maxIndexedChatsPerProject": 8,
+  "maxActiveTuis": 8,
+  "codexRemoteEndpoint": "unix://",
+  "sourceKinds": ["cli", "vscode", "appServer"]
+}
