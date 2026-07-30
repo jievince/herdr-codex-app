@@ -39,6 +39,10 @@ test("links the default English and Simplified Chinese READMEs", () => {
   assert.match(chineseReadme, /\[English\]\(README\.md\)/);
 });
 
+test("names the public sync action clearly", () => {
+  assert.match(manifest, /title = "Sync recent Codex chats"/);
+});
+
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(root, relativePath), "utf8"));
 }

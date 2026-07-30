@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5 - 2026-07-30
+
+- Sync in the background after pane focus.
+- Throttle automatic sync requests while keeping explicit refresh available.
+- Clarify first-run, automatic, and manual sync behavior in both READMEs.
+
 ## 0.1.4 - 2026-07-30
 
 - Focus an already running Codex chat instead of starting a duplicate TUI.

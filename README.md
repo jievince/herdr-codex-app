@@ -48,22 +48,29 @@ The plugin reads your recently active Codex chats and adds them to Herdr:
 Projects appear under `spaces`, chats appear as tabs and under `agents`, and
 the selected chat runs in the main pane. `>` and `[Fix login]` mark the
 focused chat; `working` and `blocked` show non-idle chats. History tabs stay
-lightweight until focused. The plugin syncs automatically when Herdr starts
-or performs a live handoff.
+lightweight until focused.
 
-## Install
+## Install and first sync
 
 Requires Linux, Herdr 0.7.5+, Node.js 20+, and Codex CLI 0.146.0+.
 
+If Herdr is already running, use:
+
 ```bash
 herdr integration install codex
-herdr plugin install jievince/herdr-codex-app
-herdr plugin action invoke jievince.herdr-codex-app.sync
+herdr plugin install jievince/herdr-codex-app && \
+  herdr plugin action invoke jievince.herdr-codex-app.sync
 ```
 
-The last command performs the first sync immediately; later Herdr startups
-sync automatically. Reloading Herdr's config does not run the plugin's sync
-action.
+The second command installs the plugin and immediately performs the first sync.
+No Herdr restart is needed.
+
+If Herdr is not running, install the plugin without the `&& ...sync` suffix.
+The first Herdr startup performs the first sync automatically.
+
+Herdr 0.7.5 does not run a plugin startup hook when a plugin is installed into
+an existing server. If the explicit first sync was omitted, the next pane focus
+also requests it automatically.
 
 ## Use
 
@@ -71,7 +78,12 @@ action.
 2. Select the workspace for your project.
 3. Focus a Codex chat tab to resume it.
 
-Refresh chats at any time:
+The plugin syncs in the background:
+
+- when the Herdr server starts;
+- after pane focus, at most once every 30 seconds.
+
+Run the **Sync recent Codex chats** action at any time:
 
 ```bash
 herdr plugin action invoke jievince.herdr-codex-app.sync
@@ -108,9 +120,10 @@ Create `config.json` there. All fields are optional:
 | `codexRemoteEndpoint` | `"unix://"` | Endpoint used by `codex resume --remote`. |
 | `sourceKinds` | `["cli", "vscode", "appServer"]` | Codex chat sources included in sync. |
 
-### Optional refresh shortcut
+### Optional manual-sync shortcut
 
-Add this to Herdr's `config.toml`:
+Herdr 0.7.5 plugin manifests cannot register a default key binding. To add the
+recommended `prefix+Shift+U` binding, put this in Herdr's `config.toml`:
 
 ```toml
 [[keys.command]]
@@ -126,9 +139,8 @@ Reload that configuration once with Herdr's default `prefix+Shift+R`, or:
 herdr server reload-config
 ```
 
-Then `prefix+Shift+U` refreshes Codex chats. Config reload only applies the
-binding; it does not refresh chats by itself. The example avoids `prefix+r`
-because Herdr uses it for resize mode by default.
+Then `prefix+Shift+U` runs **Sync recent Codex chats**. Config reload only
+applies the binding; it does not run the action.
 
 Run the refresh action after changing indexing limits or sources. Other
 settings apply on the next chat focus.

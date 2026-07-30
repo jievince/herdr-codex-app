@@ -31,6 +31,15 @@ test("focus resumes a placeholder through the shared app server", () => {
     assert.deepEqual(fixture.codexCalls, [
       ["app-server", "daemon", "start"],
     ]);
+    assert.ok(
+      fixture.herdrCalls.some(
+        (args) =>
+          args[0] === "plugin" &&
+          args[1] === "action" &&
+          args[2] === "invoke" &&
+          args[3] === "jievince.herdr-codex-app.sync",
+      ),
+    );
     const saved = JSON.parse(
       fs.readFileSync(path.join(fixture.stateDirectory, "index.json"), "utf8"),
     );
@@ -326,6 +335,13 @@ if (args[0] === "workspace" && args[1] === "list") {
   }
   save();
   respond({ agent: state.panes.find((pane) => pane.pane_id === args[2]) });
+} else if (
+  args[0] === "plugin" &&
+  args[1] === "action" &&
+  args[2] === "invoke" &&
+  args[3] === "jievince.herdr-codex-app.sync"
+) {
+  respond({ type: "plugin_action_invoked" });
 } else {
   process.stderr.write("unsupported fake Herdr command: " + args.join(" ") + "\\n");
   process.exit(2);

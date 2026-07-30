@@ -1,6 +1,6 @@
 id = "jievince.herdr-codex-app"
 name = "Herdr Codex App"
-version = "0.1.4"
+version = "0.1.5"
 min_herdr_version = "0.7.5"
 description = "Automatically sync recent Codex chats and projects into Herdr."
 platforms = ["linux"]
@@ -13,7 +13,7 @@ command = ["node", "src/sync.mjs"]
 
 [[actions]]
 id = "sync"
-title = "Refresh Codex chats"
+title = "Sync recent Codex chats"
 contexts = ["global", "workspace"]
 command = ["node", "src/sync.mjs"]
 

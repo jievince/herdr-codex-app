@@ -47,21 +47,27 @@
 
 项目显示在 `spaces`，会话显示为顶部 tab 和 `agents` 条目，选中的会话运行在
 右侧主 pane。`>` 和 `[Fix login]` 表示当前聚焦的会话，`working` 和
-`blocked` 展示非空闲会话。历史 tab 在聚焦前只占用轻量资源。Herdr 启动或
-执行 live handoff 时，插件会自动同步。
+`blocked` 展示非空闲会话。历史 tab 在聚焦前只占用轻量资源。
 
-## 安装
+## 安装与首次同步
 
 需要 Linux、Herdr 0.7.5+、Node.js 20+ 和 Codex CLI 0.146.0+。
 
+如果 Herdr 已经在运行，请执行：
+
 ```bash
 herdr integration install codex
-herdr plugin install jievince/herdr-codex-app
-herdr plugin action invoke jievince.herdr-codex-app.sync
+herdr plugin install jievince/herdr-codex-app && \
+  herdr plugin action invoke jievince.herdr-codex-app.sync
 ```
 
-最后一条命令会立即完成首次同步；此后 Herdr 启动时会自动同步。重新加载
-Herdr 配置并不会执行插件的同步动作。
+第二条命令会安装插件并立即完成首次同步，不需要重启 Herdr。
+
+如果 Herdr 尚未运行，安装插件时去掉 `&& ...sync` 后缀；首次启动 Herdr 时会
+自动完成首次同步。
+
+Herdr 0.7.5 不会在运行中的 server 安装插件后执行插件的 startup hook。如果
+漏掉了显式首次同步，下一次 pane 聚焦也会自动请求同步。
 
 ## 使用
 
@@ -69,7 +75,12 @@ Herdr 配置并不会执行插件的同步动作。
 2. 选择项目对应的 workspace。
 3. 聚焦一个 Codex 会话 tab，即可恢复该会话。
 
-也可以随时刷新会话：
+插件会在以下时机自动后台同步：
+
+- Herdr server 启动时；
+- pane 聚焦后，最多每 30 秒一次。
+
+也可以随时执行 **Sync recent Codex chats**：
 
 ```bash
 herdr plugin action invoke jievince.herdr-codex-app.sync
@@ -106,9 +117,10 @@ herdr plugin config-dir jievince.herdr-codex-app
 | `codexRemoteEndpoint` | `"unix://"` | `codex resume --remote` 使用的端点。 |
 | `sourceKinds` | `["cli", "vscode", "appServer"]` | 同步时包含的 Codex 会话来源。 |
 
-### 可选刷新快捷键
+### 可选手动同步快捷键
 
-将以下内容加入 Herdr 的 `config.toml`：
+Herdr 0.7.5 的插件 manifest 不能注册默认快捷键。如需使用推荐的
+`prefix+Shift+U`，请将以下内容加入 Herdr 的 `config.toml`：
 
 ```toml
 [[keys.command]]
@@ -124,9 +136,8 @@ description = "sync recent Codex chats"
 herdr server reload-config
 ```
 
-此后按 `prefix+Shift+U` 即可刷新 Codex 会话。重新加载配置只负责让快捷键
-生效，不会自行刷新会话。示例没有占用 `prefix+r`，因为它默认用于 resize
-mode。
+此后按 `prefix+Shift+U` 即会执行 **Sync recent Codex chats**。重新加载
+配置只负责让快捷键生效，不会执行同步动作。
 
 修改索引数量或会话来源后，请执行一次刷新；其他配置会在下次聚焦会话时生效。
 

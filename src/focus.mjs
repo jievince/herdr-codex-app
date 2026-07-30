@@ -1,4 +1,5 @@
 import { ensureCodexAppServer } from "./codex-client.mjs";
+import { requestAutoSync } from "./auto-sync-core.mjs";
 import {
   PLACEHOLDER_AGENT,
   PLACEHOLDER_SOURCE,
@@ -24,6 +25,10 @@ const paneId = paneIdFromEvent();
 if (paneId) {
   try {
     await handleFocus(paneId);
+    const syncRequest = await requestAutoSync();
+    if (syncRequest?.requested) {
+      process.stdout.write("Requested Codex chat sync after pane focus.\n");
+    }
   } catch (error) {
     process.stderr.write(`Codex chat focus failed: ${error.message}\n`);
     process.exitCode = 1;

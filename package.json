@@ -1,6 +1,6 @@
 {
   "name": "herdr-codex-app",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Automatically sync recent Codex chats and projects into Herdr.",
   "type": "module",

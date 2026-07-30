@@ -1,4 +1,5 @@
 import { listCodexThreads } from "./codex-client.mjs";
+import { recordSyncSuccess } from "./auto-sync-core.mjs";
 import {
   loadConfig,
   loadState,
@@ -16,6 +17,8 @@ try {
   const result = await withLock("sync", synchronize);
   if (result?.skipped) {
     process.stdout.write("Codex chat refresh is already running.\n");
+  } else {
+    recordSyncSuccess();
   }
 } catch (error) {
   process.stderr.write(`Codex chat refresh failed: ${error.message}\n`);
