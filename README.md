@@ -14,7 +14,7 @@ The plugin reads your recently active Codex chats and adds them to Herdr:
 
 ```text
 ┌ Herdr ──────────────────────┬───────────────────────────────────────────┐
-│ spaces                      │ < Fix login | Add tests | Update docs >  │
+│ spaces                      │ < [Fix login] | Add tests | Update docs > │
 │                             ├───────────────────────────────────────────┤
 │ ● project-1                 │                                           │
 │   main                      │                                           │
@@ -28,15 +28,15 @@ The plugin reads your recently active Codex chats and adds them to Herdr:
 │   docs                      │                                           │
 │                             │                                           │
 │ agents             priority │                                           │
-│ ● project-1        working  │                                           │
-│   Fix login...              │                                           │
+│ > project-1        working  │                                           │
+│   Fix login...     focused  │                                           │
 │ ✓ project-1           idle  │                                           │
 │   Add tests...              │                                           │
 │ ✓ project-1           idle  │                                           │
 │   Update docs...            │                                           │
 │ ✓ project-2           idle  │                                           │
 │   Improve search...         │                                           │
-│ ✓ project-3           idle  │                                           │
+│ ! project-3        blocked  │                                           │
 │   Refactor cache...         │                                           │
 │ ✓ project-4           idle  │                                           │
 │   Prepare release...        │                                           │
@@ -46,9 +46,10 @@ The plugin reads your recently active Codex chats and adds them to Herdr:
 ```
 
 Projects appear under `spaces`, chats appear as tabs and under `agents`, and
-the selected chat runs in the main pane. History tabs stay lightweight until
-focused. The plugin syncs automatically when Herdr starts or performs a live
-handoff.
+the selected chat runs in the main pane. `>` and `[Fix login]` mark the
+focused chat; `working` and `blocked` show non-idle chats. History tabs stay
+lightweight until focused. The plugin syncs automatically when Herdr starts
+or performs a live handoff.
 
 ## Install
 
@@ -61,7 +62,8 @@ herdr plugin action invoke jievince.herdr-codex-app.sync
 ```
 
 The last command performs the first sync immediately; later Herdr startups
-sync automatically.
+sync automatically. Reloading Herdr's config does not run the plugin's sync
+action.
 
 ## Use
 
@@ -69,7 +71,7 @@ sync automatically.
 2. Select the workspace for your project.
 3. Focus a Codex chat tab to resume it.
 
-Refresh at any time:
+Refresh chats at any time:
 
 ```bash
 herdr plugin action invoke jievince.herdr-codex-app.sync
@@ -105,6 +107,28 @@ Create `config.json` there. All fields are optional:
 | `maxActiveTuis` | `8` | Soft limit for running managed Codex TUIs. |
 | `codexRemoteEndpoint` | `"unix://"` | Endpoint used by `codex resume --remote`. |
 | `sourceKinds` | `["cli", "vscode", "appServer"]` | Codex chat sources included in sync. |
+
+### Optional refresh shortcut
+
+Add this to Herdr's `config.toml`:
+
+```toml
+[[keys.command]]
+key = "prefix+shift+u"
+type = "plugin_action"
+command = "jievince.herdr-codex-app.sync"
+description = "sync recent Codex chats"
+```
+
+Reload that configuration once with Herdr's default `prefix+Shift+R`, or:
+
+```bash
+herdr server reload-config
+```
+
+Then `prefix+Shift+U` refreshes Codex chats. Config reload only applies the
+binding; it does not refresh chats by itself. The example avoids `prefix+r`
+because Herdr uses it for resize mode by default.
 
 Run the refresh action after changing indexing limits or sources. Other
 settings apply on the next chat focus.

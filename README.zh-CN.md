@@ -14,7 +14,7 @@
 
 ```text
 ┌ Herdr ──────────────────────┬───────────────────────────────────────────┐
-│ spaces                      │ < Fix login | Add tests | Update docs >  │
+│ spaces                      │ < [Fix login] | Add tests | Update docs > │
 │                             ├───────────────────────────────────────────┤
 │ ● project-1                 │                                           │
 │   main                      │                                           │
@@ -28,15 +28,15 @@
 │   docs                      │                                           │
 │                             │                                           │
 │ agents             priority │                                           │
-│ ● project-1        working  │                                           │
-│   Fix login...              │                                           │
+│ > project-1        working  │                                           │
+│   Fix login...     focused  │                                           │
 │ ✓ project-1           idle  │                                           │
 │   Add tests...              │                                           │
 │ ✓ project-1           idle  │                                           │
 │   Update docs...            │                                           │
 │ ✓ project-2           idle  │                                           │
 │   Improve search...         │                                           │
-│ ✓ project-3           idle  │                                           │
+│ ! project-3        blocked  │                                           │
 │   Refactor cache...         │                                           │
 │ ✓ project-4           idle  │                                           │
 │   Prepare release...        │                                           │
@@ -46,8 +46,9 @@
 ```
 
 项目显示在 `spaces`，会话显示为顶部 tab 和 `agents` 条目，选中的会话运行在
-右侧主 pane。历史 tab 在聚焦前只占用轻量资源。Herdr 启动或执行 live
-handoff 时，插件会自动同步。
+右侧主 pane。`>` 和 `[Fix login]` 表示当前聚焦的会话，`working` 和
+`blocked` 展示非空闲会话。历史 tab 在聚焦前只占用轻量资源。Herdr 启动或
+执行 live handoff 时，插件会自动同步。
 
 ## 安装
 
@@ -59,7 +60,8 @@ herdr plugin install jievince/herdr-codex-app
 herdr plugin action invoke jievince.herdr-codex-app.sync
 ```
 
-最后一条命令会立即完成首次同步；此后 Herdr 启动时会自动同步。
+最后一条命令会立即完成首次同步；此后 Herdr 启动时会自动同步。重新加载
+Herdr 配置并不会执行插件的同步动作。
 
 ## 使用
 
@@ -67,7 +69,7 @@ herdr plugin action invoke jievince.herdr-codex-app.sync
 2. 选择项目对应的 workspace。
 3. 聚焦一个 Codex 会话 tab，即可恢复该会话。
 
-也可以随时手动刷新：
+也可以随时刷新会话：
 
 ```bash
 herdr plugin action invoke jievince.herdr-codex-app.sync
@@ -103,6 +105,28 @@ herdr plugin config-dir jievince.herdr-codex-app
 | `maxActiveTuis` | `8` | 正在运行的受管 Codex TUI 软上限。 |
 | `codexRemoteEndpoint` | `"unix://"` | `codex resume --remote` 使用的端点。 |
 | `sourceKinds` | `["cli", "vscode", "appServer"]` | 同步时包含的 Codex 会话来源。 |
+
+### 可选刷新快捷键
+
+将以下内容加入 Herdr 的 `config.toml`：
+
+```toml
+[[keys.command]]
+key = "prefix+shift+u"
+type = "plugin_action"
+command = "jievince.herdr-codex-app.sync"
+description = "sync recent Codex chats"
+```
+
+添加后，使用 Herdr 默认的 `prefix+Shift+R` 重新加载一次配置，或执行：
+
+```bash
+herdr server reload-config
+```
+
+此后按 `prefix+Shift+U` 即可刷新 Codex 会话。重新加载配置只负责让快捷键
+生效，不会自行刷新会话。示例没有占用 `prefix+r`，因为它默认用于 resize
+mode。
 
 修改索引数量或会话来源后，请执行一次刷新；其他配置会在下次聚焦会话时生效。
 
