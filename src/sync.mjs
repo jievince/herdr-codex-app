@@ -1,5 +1,5 @@
 import { listCodexThreads } from "./codex-client.mjs";
-import { recordSyncSuccess } from "./auto-sync-core.mjs";
+import { recordSyncSuccess } from "./initial-sync-core.mjs";
 import {
   loadConfig,
   loadState,

@@ -81,7 +81,7 @@ also requests it automatically.
 The plugin syncs in the background:
 
 - when the Herdr server starts;
-- after pane focus, at most once every 30 seconds.
+- once after pane focus if no sync has ever succeeded.
 
 Run the **Sync recent Codex chats** action at any time:
 

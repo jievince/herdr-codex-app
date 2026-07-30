@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 - 2026-07-30
+
+- Use pane focus only to recover a missing first sync.
+- Stop focus-driven sync permanently after the first successful sync.
+
 ## 0.1.5 - 2026-07-30
 
 - Sync in the background after pane focus.

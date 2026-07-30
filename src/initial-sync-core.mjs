@@ -8,22 +8,25 @@ import {
   withLock,
 } from "./lib.mjs";
 
-export const AUTO_SYNC_COOLDOWN_MS = 30_000;
+export const INITIAL_SYNC_RETRY_COOLDOWN_MS = 30_000;
 
-const LAST_REQUEST_FILE = "auto-sync-requested-at";
+const LAST_REQUEST_FILE = "initial-sync-requested-at";
 const LAST_SUCCESS_FILE = "last-sync-succeeded-at";
 
-export async function requestAutoSync({
+export async function requestInitialSync({
   now = Date.now(),
-  cooldownMs = AUTO_SYNC_COOLDOWN_MS,
+  retryCooldownMs = INITIAL_SYNC_RETRY_COOLDOWN_MS,
   invoke = invokeSyncAction,
 } = {}) {
-  return withLock("auto-sync-request", async () => {
-    const latest = Math.max(
-      readTimestamp(LAST_REQUEST_FILE),
-      readTimestamp(LAST_SUCCESS_FILE),
-    );
-    if (latest > 0 && now - latest < cooldownMs) {
+  return withLock("initial-sync-request", async () => {
+    // Pane focus is only a first-run recovery path; successful installations
+    // refresh later through startup or an explicit plugin action.
+    if (readTimestamp(LAST_SUCCESS_FILE) > 0) {
+      return { requested: false, reason: "already-synced" };
+    }
+
+    const lastRequest = readTimestamp(LAST_REQUEST_FILE);
+    if (lastRequest > 0 && now - lastRequest < retryCooldownMs) {
       return { requested: false, reason: "cooldown" };
     }
 

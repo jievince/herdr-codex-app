@@ -6,10 +6,10 @@ import test from "node:test";
 
 import {
   recordSyncSuccess,
-  requestAutoSync,
-} from "../src/auto-sync-core.mjs";
+  requestInitialSync,
+} from "../src/initial-sync-core.mjs";
 
-test("throttles automatic sync requests after a request or success", async () => {
+test("pane focus requests sync only until the first success", async () => {
   await withStateDirectory(async () => {
     let invocations = 0;
     const invoke = () => {
@@ -17,28 +17,28 @@ test("throttles automatic sync requests after a request or success", async () =>
     };
 
     assert.deepEqual(
-      await requestAutoSync({ now: 1_000, invoke }),
+      await requestInitialSync({ now: 1_000, invoke }),
       { requested: true },
     );
     assert.deepEqual(
-      await requestAutoSync({ now: 20_000, invoke }),
+      await requestInitialSync({ now: 20_000, invoke }),
       { requested: false, reason: "cooldown" },
     );
 
     recordSyncSuccess(25_000);
     assert.deepEqual(
-      await requestAutoSync({ now: 50_000, invoke }),
-      { requested: false, reason: "cooldown" },
+      await requestInitialSync({ now: 50_000, invoke }),
+      { requested: false, reason: "already-synced" },
     );
     assert.deepEqual(
-      await requestAutoSync({ now: 56_000, invoke }),
-      { requested: true },
+      await requestInitialSync({ now: 86_000, invoke }),
+      { requested: false, reason: "already-synced" },
     );
-    assert.equal(invocations, 2);
+    assert.equal(invocations, 1);
   });
 });
 
-test("does not enqueue automatic sync while a refresh owns the lock", async () => {
+test("does not enqueue initial sync while a refresh owns the lock", async () => {
   await withStateDirectory(async (directory) => {
     fs.writeFileSync(
       path.join(directory, "sync.lock"),
@@ -51,7 +51,7 @@ test("does not enqueue automatic sync while a refresh owns the lock", async () =
     let invoked = false;
 
     assert.deepEqual(
-      await requestAutoSync({
+      await requestInitialSync({
         now: 1_000,
         invoke: () => {
           invoked = true;
@@ -65,7 +65,7 @@ test("does not enqueue automatic sync while a refresh owns the lock", async () =
 
 async function withStateDirectory(callback) {
   const directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "herdr-codex-app-auto-sync-"),
+    path.join(os.tmpdir(), "herdr-codex-app-initial-sync-"),
   );
   const previous = process.env.HERDR_PLUGIN_STATE_DIR;
   process.env.HERDR_PLUGIN_STATE_DIR = directory;

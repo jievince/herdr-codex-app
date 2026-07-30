@@ -78,7 +78,7 @@ Herdr 0.7.5 不会在运行中的 server 安装插件后执行插件的 startup 
 插件会在以下时机自动后台同步：
 
 - Herdr server 启动时；
-- pane 聚焦后，最多每 30 秒一次。
+- 尚无成功同步记录时，在 pane 聚焦后补做一次。
 
 也可以随时执行 **Sync recent Codex chats**：
 
