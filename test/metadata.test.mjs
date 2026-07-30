@@ -27,7 +27,7 @@ test("keeps plugin identity and version metadata aligned", () => {
 
 test("keeps the public repository tagline aligned", () => {
   const tagline =
-    "Browse and resume Codex chats as native Herdr workspaces and tabs.";
+    "Automatically sync recent Codex chats and projects into Herdr.";
   assert.equal(manifestValue("description"), tagline);
   assert.equal(packageJson.description, tagline);
   assert.match(readme, new RegExp(escapeRegExp(tagline)));

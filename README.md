@@ -2,57 +2,57 @@
 
 English | [简体中文](README.zh-CN.md)
 
-**Browse and resume Codex chats as native Herdr workspaces and tabs.**
+**Automatically sync recent Codex chats and projects into Herdr.**
 
-Herdr's built-in Codex integration recognizes running Codex agents. This
-plugin adds your saved Codex chat history to Herdr's normal navigation:
+The plugin reads your recently active Codex chats and adds them to Herdr:
 
-- one workspace per exact project directory;
-- one tab per indexed Codex chat;
-- a lightweight history placeholder until you focus the tab;
-- lazy resume through the shared Codex app server;
-- a soft LRU limit for active Codex TUIs.
+- each exact project directory becomes a Herdr workspace;
+- each Codex chat becomes a tab in that workspace;
+- focusing a chat tab resumes its Codex TUI.
 
 ## What it looks like
 
 ```text
-+ HERDR ---------------------------------------------------------------+
-| WORKSPACES / PROJECTS       | ACTIVE WORKSPACE: project-1            |
-|                             |                                        |
-| > project-1                 | TABS                                   |
-|   project-2                 | [Feature*] [Tests: history]            |
-|   herdr-codex-app           | [Write docs: history]                  |
-|                             +----------------------------------------+
-| AGENTS                      | ACTIVE PANE                            |
-|                             |                                        |
-| Codex          working      | Codex                                  |
-| Codex history  idle         | status: working                        |
-| Codex history  idle         | cwd: ~/project-1                       |
-|                             |                                        |
-|                             | > Implement the feature...             |
-+---------------------------------------------------------------------+
-
-  Codex project directory -> Herdr workspace
-  Saved Codex chat        -> workspace tab
-  Focus a history tab     -> resume its Codex TUI
-  Exceed the TUI limit    -> park the least-recent safe TUI
+┌ Herdr ──────────────────────┬───────────────────────────────────────────┐
+│ spaces                      │ < Fix login | Add tests | Update docs >  │
+│                             ├───────────────────────────────────────────┤
+│ ● project-1                 │                                           │
+│   main                      │                                           │
+│ ○ project-2                 │                 Codex TUI                 │
+│   feature/search            │                                           │
+│ ○ project-3                 │  Focus a chat tab to resume it.           │
+│   main                      │                                           │
+│ ○ project-4                 │                                           │
+│   release                   │                                           │
+│ ○ project-5                 │                                           │
+│   docs                      │                                           │
+│                             │                                           │
+│ agents             priority │                                           │
+│ ● project-1        working  │                                           │
+│   Fix login...              │                                           │
+│ ✓ project-1           idle  │                                           │
+│   Add tests...              │                                           │
+│ ✓ project-1           idle  │                                           │
+│   Update docs...            │                                           │
+│ ✓ project-2           idle  │                                           │
+│   Improve search...         │                                           │
+│ ✓ project-3           idle  │                                           │
+│   Refactor cache...         │                                           │
+│ ✓ project-4           idle  │                                           │
+│   Prepare release...        │                                           │
+│ ✓ project-5           idle  │                                           │
+│   Review docs...            │                                           │
+└─────────────────────────────┴───────────────────────────────────────────┘
 ```
 
-Colors and dimensions follow the user's Herdr theme and terminal.
-
-## Requirements
-
-- Herdr 0.7.5 or newer;
-- Linux;
-- Node.js 20 or newer;
-- Codex CLI 0.146.0 or newer.
-
-The installer checks Node.js and Codex CLI versions before registering the
-plugin. Codex CLI 0.146.0 is the oldest verified version.
+Projects appear under `spaces`, chats appear as tabs and under `agents`, and
+the selected chat runs in the main pane. History tabs stay lightweight until
+focused. The plugin syncs automatically when Herdr starts or performs a live
+handoff.
 
 ## Install
 
-Install Herdr's Codex integration first:
+Requires Linux, Herdr 0.7.5+, Node.js 20+, and Codex CLI 0.146.0+.
 
 ```bash
 herdr integration install codex
@@ -60,22 +60,33 @@ herdr plugin install jievince/herdr-codex-app
 herdr plugin action invoke jievince.herdr-codex-app.sync
 ```
 
-The explicit first refresh is intentional. A Herdr startup hook runs when the
-server starts or performs a live handoff, not immediately after `plugin
-install` or `plugin link`.
+The last command performs the first sync immediately; later Herdr startups
+sync automatically.
 
-Open Herdr's workspace browser after the refresh. Select a generated project
-workspace, then focus a history tab to resume that chat.
+## Use
 
-## Configuration
+1. Open Herdr's workspace browser.
+2. Select the workspace for your project.
+3. Focus a Codex chat tab to resume it.
 
-Find the plugin's configuration directory:
+Refresh at any time:
+
+```bash
+herdr plugin action invoke jievince.herdr-codex-app.sync
+```
+
+If the same chat is already running in another pane, the plugin focuses that
+pane instead of starting a second TUI.
+
+## Configure
+
+Find the configuration directory:
 
 ```bash
 herdr plugin config-dir jievince.herdr-codex-app
 ```
 
-Create `config.json` there. Every field is optional:
+Create `config.json` there. All fields are optional:
 
 ```json
 {
@@ -87,60 +98,24 @@ Create `config.json` there. Every field is optional:
 }
 ```
 
-| Field | Default | Purpose |
+| Field | Default | Meaning |
 | --- | ---: | --- |
-| `maxIndexedChats` | `40` | Maximum recent chats shown across all projects. |
-| `maxIndexedChatsPerProject` | `8` | Maximum recent chats shown for one exact project directory. |
+| `maxIndexedChats` | `40` | Recent chats kept across all projects. |
+| `maxIndexedChatsPerProject` | `8` | Recent chats kept for one exact project directory. |
 | `maxActiveTuis` | `8` | Soft limit for running managed Codex TUIs. |
-| `codexRemoteEndpoint` | `"unix://"` | Endpoint passed to `codex resume --remote`. |
-| `sourceKinds` | `["cli", "vscode", "appServer"]` | Interactive Codex thread sources requested from `thread/list`. |
+| `codexRemoteEndpoint` | `"unix://"` | Endpoint used by `codex resume --remote`. |
+| `sourceKinds` | `["cli", "vscode", "appServer"]` | Codex chat sources included in sync. |
 
-Configuration is read on every startup hook, refresh action, and focus event.
-Run the refresh action after changing history limits or source kinds. LRU and
-endpoint changes apply on the next relevant focus event.
+Run the refresh action after changing indexing limits or sources. Other
+settings apply on the next chat focus.
 
-Malformed JSON fails visibly. Invalid positive-integer limits, an empty
-endpoint, and an empty or non-array `sourceKinds` value use their documented
-defaults.
+## Notes
 
-### Active-TUI LRU
-
-The TUI limit is deliberately soft:
-
-- the focused pane is never parked;
-- `working`, `blocked`, and `unknown` Codex TUIs are never parked;
-- only unfocused `idle` or `done` managed TUIs are candidates;
-- parking sends `/quit`, waits for the TUI to exit, then restores the history
-  placeholder.
-
-If no additional TUI is safe to park, the plugin reports the remaining
-overflow instead of killing a busy or ambiguous process.
-
-## Safety and privacy
-
-The plugin changes Herdr navigation, not Codex history:
-
-- it creates or reuses workspaces by exact project directory;
-- it owns only tabs and placeholders marked with its metadata;
-- it revalidates ownership, pane count, focus, and thread ID immediately
-  before cleanup;
-- it never closes a user tab or a tab containing a live Codex TUI;
-- it never edits or deletes Codex transcripts.
-
-Plugin state contains local project paths, Codex thread IDs, chat titles,
-Herdr IDs, and focus/parking timestamps. It does not store chat transcripts.
-Configuration and state stay in Herdr's per-plugin directories.
-
-## Known boundary
-
-The app can safely resume and manage panes carrying an exact
-`codex_thread_id`. Indexed history tabs always have one.
-
-A brand-new standalone `codex` TUI does not expose its new thread ID in its
-process arguments. Until Herdr has exact thread metadata, the plugin leaves
-that pane alone. An older `codex resume <thread-id>` process with exact
-metadata can be migrated to the shared app server only while it is `idle` or
-`done`.
+- The plugin stores paths, chat IDs, titles, and Herdr placement metadata, but
+  never stores or edits Codex transcripts.
+- The active-TUI limit only parks unfocused `idle` or `done` managed TUIs. It
+  never kills a working, blocked, focused, or unknown process.
+- Invalid JSON fails visibly. Invalid field values use the documented defaults.
 
 ## Development
 
@@ -151,9 +126,7 @@ npm test
 npm run preflight
 ```
 
-Tests use temporary directories and fake Herdr/Codex executables. They do not
-modify a running Herdr session. See [RELEASING.md](RELEASING.md) for the
-release checklist.
+See [RELEASING.md](RELEASING.md) for the release checklist.
 
 ## License
 

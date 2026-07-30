@@ -2,57 +2,56 @@
 
 [English](README.md) | 简体中文
 
-**在 Herdr 原生工作区和标签页中浏览并恢复 Codex 对话。**
+**自动把最近活跃的 Codex 会话和项目同步到 Herdr。**
 
-Herdr 内置的 Codex integration 负责识别正在运行的 Codex Agent。本插件把
-已保存的 Codex 对话历史加入 Herdr 原生导航：
+插件读取最近活跃的 Codex 会话，并将它们加入 Herdr：
 
-- 每个精确的项目目录对应一个工作区；
-- 每个已索引的 Codex 对话对应一个标签页；
-- 聚焦前只保留轻量历史占位；
-- 聚焦标签页时通过共享 Codex app server 按需恢复；
-- 用软 LRU 限制正在运行的 Codex TUI 数量。
+- 每个精确的项目目录对应一个 Herdr workspace；
+- 每个 Codex 会话对应该 workspace 中的一个 tab；
+- 聚焦会话 tab，即可恢复对应的 Codex TUI。
 
 ## 界面效果
 
 ```text
-+ HERDR ---------------------------------------------------------------+
-| 工作区 / 项目                | 当前工作区：project-1                   |
-|                             |                                        |
-| > project-1                 | 标签页                                 |
-|   project-2                 | [功能*] [测试：历史]                     |
-|   herdr-codex-app           | [编写文档：历史]                        |
-|                             +----------------------------------------+
-| AGENT                       | 当前窗格                                |
-|                             |                                        |
-| Codex          工作中       | Codex                                  |
-| Codex history  空闲         | 状态：工作中                            |
-| Codex history  空闲         | cwd: ~/project-1                       |
-|                             |                                        |
-|                             | > 实现这个功能……                        |
-+---------------------------------------------------------------------+
-
-  Codex 项目目录 -> Herdr 工作区
-  已保存的对话   -> 工作区标签页
-  聚焦历史标签页 -> 恢复对应的 Codex TUI
-  超过 TUI 上限  -> 停放最近最少使用且安全的 TUI
+┌ Herdr ──────────────────────┬───────────────────────────────────────────┐
+│ spaces                      │ < Fix login | Add tests | Update docs >  │
+│                             ├───────────────────────────────────────────┤
+│ ● project-1                 │                                           │
+│   main                      │                                           │
+│ ○ project-2                 │                 Codex TUI                 │
+│   feature/search            │                                           │
+│ ○ project-3                 │  Focus a chat tab to resume it.           │
+│   main                      │                                           │
+│ ○ project-4                 │                                           │
+│   release                   │                                           │
+│ ○ project-5                 │                                           │
+│   docs                      │                                           │
+│                             │                                           │
+│ agents             priority │                                           │
+│ ● project-1        working  │                                           │
+│   Fix login...              │                                           │
+│ ✓ project-1           idle  │                                           │
+│   Add tests...              │                                           │
+│ ✓ project-1           idle  │                                           │
+│   Update docs...            │                                           │
+│ ✓ project-2           idle  │                                           │
+│   Improve search...         │                                           │
+│ ✓ project-3           idle  │                                           │
+│   Refactor cache...         │                                           │
+│ ✓ project-4           idle  │                                           │
+│   Prepare release...        │                                           │
+│ ✓ project-5           idle  │                                           │
+│   Review docs...            │                                           │
+└─────────────────────────────┴───────────────────────────────────────────┘
 ```
 
-实际颜色和尺寸由用户的 Herdr 主题及终端决定。
-
-## 环境要求
-
-- Herdr 0.7.5 或更新版本；
-- Linux；
-- Node.js 20 或更新版本；
-- Codex CLI 0.146.0 或更新版本。
-
-安装前会检查 Node.js 和 Codex CLI 版本。Codex CLI 0.146.0 是本项目验证过
-的最旧版本。
+项目显示在 `spaces`，会话显示为顶部 tab 和 `agents` 条目，选中的会话运行在
+右侧主 pane。历史 tab 在聚焦前只占用轻量资源。Herdr 启动或执行 live
+handoff 时，插件会自动同步。
 
 ## 安装
 
-先安装 Herdr 的 Codex integration：
+需要 Linux、Herdr 0.7.5+、Node.js 20+ 和 Codex CLI 0.146.0+。
 
 ```bash
 herdr integration install codex
@@ -60,21 +59,32 @@ herdr plugin install jievince/herdr-codex-app
 herdr plugin action invoke jievince.herdr-codex-app.sync
 ```
 
-首次需要显式刷新。Herdr 的 startup hook 只会在 server 启动或 live handoff
-后运行，不会因为 `plugin install` 或 `plugin link` 完成而立即运行。
+最后一条命令会立即完成首次同步；此后 Herdr 启动时会自动同步。
 
-刷新后打开 Herdr 工作区浏览器，进入插件生成的项目工作区，再聚焦历史标签页
-即可恢复对应对话。
+## 使用
+
+1. 打开 Herdr 的 workspace 浏览器。
+2. 选择项目对应的 workspace。
+3. 聚焦一个 Codex 会话 tab，即可恢复该会话。
+
+也可以随时手动刷新：
+
+```bash
+herdr plugin action invoke jievince.herdr-codex-app.sync
+```
+
+如果同一会话已经在其他 pane 中运行，插件会直接聚焦那个 pane，不会重复启动
+第二个 TUI。
 
 ## 配置
 
-查询插件配置目录：
+查询配置目录：
 
 ```bash
 herdr plugin config-dir jievince.herdr-codex-app
 ```
 
-在该目录创建 `config.json`。所有字段均可省略：
+在该目录创建 `config.json`。所有字段都可省略：
 
 ```json
 {
@@ -86,55 +96,23 @@ herdr plugin config-dir jievince.herdr-codex-app
 }
 ```
 
-| 字段 | 默认值 | 作用 |
+| 字段 | 默认值 | 含义 |
 | --- | ---: | --- |
-| `maxIndexedChats` | `40` | 所有项目最多展示的近期对话数。 |
-| `maxIndexedChatsPerProject` | `8` | 单个精确项目目录最多展示的近期对话数。 |
+| `maxIndexedChats` | `40` | 所有项目保留的最近会话数。 |
+| `maxIndexedChatsPerProject` | `8` | 单个精确项目目录保留的最近会话数。 |
 | `maxActiveTuis` | `8` | 正在运行的受管 Codex TUI 软上限。 |
-| `codexRemoteEndpoint` | `"unix://"` | 传给 `codex resume --remote` 的端点。 |
-| `sourceKinds` | `["cli", "vscode", "appServer"]` | 请求 `thread/list` 时使用的交互式 Codex thread 来源。 |
+| `codexRemoteEndpoint` | `"unix://"` | `codex resume --remote` 使用的端点。 |
+| `sourceKinds` | `["cli", "vscode", "appServer"]` | 同步时包含的 Codex 会话来源。 |
 
-每次 startup hook、刷新动作和焦点事件都会重新读取配置。修改历史数量或
-source kinds 后执行一次刷新；LRU 和端点修改会在下一个相关焦点事件生效。
+修改索引数量或会话来源后，请执行一次刷新；其他配置会在下次聚焦会话时生效。
 
-JSON 格式错误会明确失败。不是正整数的数量限制、空端点，以及空数组或
-非数组的 `sourceKinds` 会使用文档中的默认值。
+## 补充说明
 
-### 活跃 TUI LRU
-
-TUI 上限是刻意设计的软限制：
-
-- 永不停止当前聚焦的窗格；
-- 永不停止 `working`、`blocked` 或 `unknown` Codex TUI；
-- 只选择未聚焦且状态为 `idle` 或 `done` 的受管 TUI；
-- 停放时发送 `/quit`，等待 TUI 退出，再恢复历史占位。
-
-如果没有更多 TUI 可以安全停放，插件会报告剩余超量，不会杀死繁忙或身份不明
-的进程。
-
-## 安全与隐私
-
-插件修改的是 Herdr 导航，不是 Codex 历史：
-
-- 按精确项目目录创建或复用工作区；
-- 只拥有带有自身 metadata 的标签页和占位；
-- 清理前立即重新验证所有权、窗格数量、焦点和 thread ID；
-- 永不关闭用户标签页或仍运行 Codex TUI 的标签页；
-- 永不修改或删除 Codex transcript。
-
-插件状态包含本地项目路径、Codex thread ID、对话标题、Herdr ID，以及聚焦/
-停放时间戳，不保存对话 transcript。配置和状态均位于 Herdr 为本插件分配的
-独立目录。
-
-## 已知边界
-
-插件只能安全恢复和管理带有精确 `codex_thread_id` 的窗格；由插件索引的历史
-标签页始终具有该 metadata。
-
-全新启动的独立 `codex` TUI 不会在进程参数中暴露新 thread ID。在 Herdr
-获得精确 thread metadata 前，插件不会接管该窗格。带有精确 metadata 的旧式
-`codex resume <thread-id>` 进程，只有在 `idle` 或 `done` 状态下才会迁移到
-共享 app server。
+- 插件保存项目路径、会话 ID、标题和 Herdr 位置元数据，但不保存或修改 Codex
+  对话原文。
+- 活跃 TUI 上限只会停放未聚焦且状态为 `idle` 或 `done` 的受管 TUI；不会终止
+  工作中、阻塞、已聚焦或状态未知的进程。
+- JSON 格式错误会明确失败；字段值无效时使用文档中的默认值。
 
 ## 开发
 
@@ -145,8 +123,7 @@ npm test
 npm run preflight
 ```
 
-测试只使用临时目录和假的 Herdr/Codex 可执行文件，不会修改正在运行的 Herdr
-session。发布流程见 [RELEASING.md](RELEASING.md)。
+发布检查清单见 [RELEASING.md](RELEASING.md)。
 
 ## 许可证
 

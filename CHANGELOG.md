@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4 - 2026-07-30
+
+- Focus an already running Codex chat instead of starting a duplicate TUI.
+- Simplify the English and Chinese READMEs around automatic recent-chat and
+  project sync.
+
 ## 0.1.3 - 2026-07-30
 
 - Use fictional project data in all public documentation examples.

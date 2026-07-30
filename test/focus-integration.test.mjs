@@ -40,6 +40,46 @@ test("focus resumes a placeholder through the shared app server", () => {
   }
 });
 
+test("focus redirects to an existing TUI for the same thread", () => {
+  const fixture = runFocus({
+    agent: "codex-history",
+    agentStatus: "idle",
+    processArgv: [],
+    otherPanes: [
+      {
+        pane_id: "w2:p1",
+        workspace_id: "w2",
+        tab_id: "w2:t1",
+        focused: false,
+        agent: "codex",
+        agent_status: "working",
+        processArgv: ["codex", "resume", "thread1"],
+        tokens: {},
+      },
+    ],
+  });
+  try {
+    assert.equal(fixture.result.status, 0, fixture.result.stderr);
+    assert.match(fixture.result.stdout, /already running in w2:p1/);
+    assert.ok(
+      fixture.herdrCalls.some(
+        (args) =>
+          args[0] === "agent" &&
+          args[1] === "focus" &&
+          args[2] === "w2:p1",
+      ),
+    );
+    assert.ok(
+      !fixture.herdrCalls.some(
+        (args) => args[0] === "agent" && args[1] === "start",
+      ),
+    );
+    assert.deepEqual(fixture.codexCalls, []);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("focus migrates an idle standalone resume before reopening remotely", () => {
   const fixture = runFocus({
     agent: "codex",
@@ -91,7 +131,13 @@ test("focus does not resume a chat while history refresh holds the sync lock", (
   }
 });
 
-function runFocus({ agent, agentStatus, processArgv, syncLocked = false }) {
+function runFocus({
+  agent,
+  agentStatus,
+  processArgv,
+  otherPanes = [],
+  syncLocked = false,
+}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "herdr-csi-focus-"));
   const stateDirectory = path.join(root, "plugin-state");
   const configDirectory = path.join(root, "plugin-config");
@@ -105,7 +151,21 @@ function runFocus({ agent, agentStatus, processArgv, syncLocked = false }) {
   fs.writeFileSync(
     runtimeStatePath,
     `${JSON.stringify({
-      workspaces: [{ workspace_id: "w1", label: "project" }],
+      workspaces: [
+        { workspace_id: "w1", label: "project" },
+        ...otherPanes
+          .filter(
+            (pane, index, panes) =>
+              panes.findIndex(
+                (candidate) =>
+                  candidate.workspace_id === pane.workspace_id,
+              ) === index,
+          )
+          .map((pane) => ({
+            workspace_id: pane.workspace_id,
+            label: pane.workspace_id,
+          })),
+      ],
       processArgv,
       panes: [
         {
@@ -117,6 +177,7 @@ function runFocus({ agent, agentStatus, processArgv, syncLocked = false }) {
           agent_status: agentStatus,
           tokens: { codex_thread_id: "thread1" },
         },
+        ...otherPanes,
       ],
     })}\n`,
   );
@@ -211,14 +272,21 @@ if (args[0] === "workspace" && args[1] === "list") {
   respond({ panes: state.panes });
 } else if (args[0] === "pane" && args[1] === "get") {
   respond({ pane: state.panes.find((pane) => pane.pane_id === args[2]) || null });
+} else if (args[0] === "pane" && args[1] === "list") {
+  const workspaceId = args[args.indexOf("--workspace") + 1];
+  respond({
+    panes: state.panes.filter((pane) => pane.workspace_id === workspaceId),
+  });
 } else if (args[0] === "pane" && args[1] === "process-info") {
+  const paneId = args[args.indexOf("--pane") + 1];
+  const pane = state.panes.find((candidate) => candidate.pane_id === paneId);
   respond({
     process_info: {
       foreground_processes: [
         {
           name: "codex",
           argv0: "/opt/codex/bin/codex",
-          argv: state.processArgv || [],
+          argv: pane?.processArgv || state.processArgv || [],
         },
       ],
     },
@@ -252,6 +320,12 @@ if (args[0] === "workspace" && args[1] === "list") {
   pane.agent_status = "idle";
   save();
   respond({ agent: { pane_id: paneId, agent: "codex" } });
+} else if (args[0] === "agent" && args[1] === "focus") {
+  for (const pane of state.panes) {
+    pane.focused = pane.pane_id === args[2];
+  }
+  save();
+  respond({ agent: state.panes.find((pane) => pane.pane_id === args[2]) });
 } else {
   process.stderr.write("unsupported fake Herdr command: " + args.join(" ") + "\\n");
   process.exit(2);

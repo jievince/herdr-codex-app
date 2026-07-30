@@ -4,9 +4,11 @@ import {
   PLACEHOLDER_SOURCE,
 } from "./constants.mjs";
 import {
+  codexTuiResumesThread,
   enforceActiveTuiLimit,
   gracefullyParkManagedPane,
   isStandaloneCodexTuiProcessInfo,
+  listAllPanes,
 } from "./lru.mjs";
 import {
   codexAgentName,
@@ -76,6 +78,15 @@ async function handleFocus(targetPaneId) {
     threadId &&
     (!pane.agent || pane.agent === PLACEHOLDER_AGENT)
   ) {
+    const runningPaneId = findRunningThreadPane(threadId, targetPaneId);
+    if (runningPaneId) {
+      // One Codex thread must have at most one live TUI.
+      runHerdr(["agent", "focus", runningPaneId]);
+      process.stdout.write(
+        `Codex chat ${threadId} is already running in ${runningPaneId}; focused it instead.\n`,
+      );
+      return;
+    }
     const result = await withLock(`resume-${threadId}`, () =>
       resumeThread(targetPaneId, threadId, config.codexRemoteEndpoint),
     );
@@ -98,6 +109,38 @@ async function handleFocus(targetPaneId) {
       "Skipped Codex TUI LRU because another pass is still running.\n",
     );
   }
+}
+
+function findRunningThreadPane(threadId, targetPaneId) {
+  for (const candidate of listAllPanes()) {
+    if (
+      candidate.pane_id === targetPaneId ||
+      candidate.agent !== "codex"
+    ) {
+      continue;
+    }
+    if (
+      candidate.agent_session?.agent === "codex" &&
+      candidate.agent_session.value === threadId
+    ) {
+      return candidate.pane_id;
+    }
+    const response = runHerdr([
+      "pane",
+      "process-info",
+      "--pane",
+      candidate.pane_id,
+    ]);
+    if (
+      codexTuiResumesThread(
+        response?.result?.process_info,
+        threadId,
+      )
+    ) {
+      return candidate.pane_id;
+    }
+  }
+  return null;
 }
 
 function isStandaloneCodexTui(targetPaneId) {

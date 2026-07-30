@@ -1,8 +1,8 @@
 id = "jievince.herdr-codex-app"
 name = "Herdr Codex App"
-version = "0.1.3"
+version = "0.1.4"
 min_herdr_version = "0.7.5"
-description = "Browse and resume Codex chats as native Herdr workspaces and tabs."
+description = "Automatically sync recent Codex chats and projects into Herdr."
 platforms = ["linux"]
 
 [[build]]

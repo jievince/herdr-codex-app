@@ -29,4 +29,4 @@ Use this checklist for every tagged release.
 
 The repository description should be:
 
-> Browse and resume Codex chats as native Herdr workspaces and tabs.
+> Automatically sync recent Codex chats and projects into Herdr.
