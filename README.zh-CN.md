@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-**自动把最近活跃的 Codex 会话和项目同步到 Herdr。**
+**自动把最近活跃的 Codex 会话和项目同步到 [Herdr](https://herdr.dev)。**
 
 插件读取最近活跃的 Codex 会话，并将它们加入 Herdr：
 

@@ -30,7 +30,14 @@ test("keeps the public repository tagline aligned", () => {
     "Automatically sync recent Codex chats and projects into Herdr.";
   assert.equal(manifestValue("description"), tagline);
   assert.equal(packageJson.description, tagline);
-  assert.match(readme, new RegExp(escapeRegExp(tagline)));
+  assert.match(
+    readme,
+    /Automatically sync recent Codex chats and projects into \[Herdr\]\(https:\/\/herdr\.dev\)\./,
+  );
+  assert.match(
+    chineseReadme,
+    /自动把最近活跃的 Codex 会话和项目同步到 \[Herdr\]\(https:\/\/herdr\.dev\)。/,
+  );
   assert.match(releasing, new RegExp(escapeRegExp(tagline)));
 });
 
