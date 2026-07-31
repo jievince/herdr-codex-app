@@ -29,4 +29,4 @@ Use this checklist for every tagged release.
 
 The repository description should be:
 
-> Automatically sync recent Codex chats and projects into Herdr.
+> Turn Herdr into a terminal-first Codex app: sync projects, resume chats.

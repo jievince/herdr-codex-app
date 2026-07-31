@@ -27,16 +27,16 @@ test("keeps plugin identity and version metadata aligned", () => {
 
 test("keeps the public repository tagline aligned", () => {
   const tagline =
-    "Automatically sync recent Codex chats and projects into Herdr.";
+    "Turn Herdr into a terminal-first Codex app: sync projects, resume chats.";
   assert.equal(manifestValue("description"), tagline);
   assert.equal(packageJson.description, tagline);
   assert.match(
     readme,
-    /Automatically sync recent Codex chats and projects into \[Herdr\]\(https:\/\/herdr\.dev\)\./,
+    /Turn \[Herdr\]\(https:\/\/herdr\.dev\) into a terminal-first Codex app: sync projects, resume chats\./,
   );
   assert.match(
     chineseReadme,
-    /自动把最近活跃的 Codex 会话和项目同步到 \[Herdr\]\(https:\/\/herdr\.dev\)。/,
+    /把 \[Herdr\]\(https:\/\/herdr\.dev\) 变成终端里的 Codex App：同步项目，随时恢复会话。/,
   );
   assert.match(releasing, new RegExp(escapeRegExp(tagline)));
 });

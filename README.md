@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-**Automatically sync recent Codex chats and projects into [Herdr](https://herdr.dev).**
+**Turn [Herdr](https://herdr.dev) into a terminal-first Codex app: sync projects, resume chats.**
 
 The plugin reads your recently active Codex chats and adds them to Herdr:
 

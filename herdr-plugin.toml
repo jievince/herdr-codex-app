@@ -2,7 +2,7 @@ id = "jievince.herdr-codex-app"
 name = "Herdr Codex App"
 version = "0.1.6"
 min_herdr_version = "0.7.5"
-description = "Automatically sync recent Codex chats and projects into Herdr."
+description = "Turn Herdr into a terminal-first Codex app: sync projects, resume chats."
 platforms = ["linux"]
 
 [[build]]

@@ -2,7 +2,7 @@
   "name": "herdr-codex-app",
   "version": "0.1.6",
   "private": true,
-  "description": "Automatically sync recent Codex chats and projects into Herdr.",
+  "description": "Turn Herdr into a terminal-first Codex app: sync projects, resume chats.",
   "type": "module",
   "engines": {
     "node": ">=20"
