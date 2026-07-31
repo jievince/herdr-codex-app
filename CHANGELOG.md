@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7 - 2026-07-31
+
+- Reframe the public tagline around the terminal-first Codex app experience.
+
 ## 0.1.6 - 2026-07-30
 
 - Use pane focus only to recover a missing first sync.
