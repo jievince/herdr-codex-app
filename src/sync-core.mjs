@@ -442,6 +442,29 @@ function markPane({
   runHerdr,
   reportPlaceholder,
 }) {
+  reportThreadPaneMetadata({
+    pane,
+    thread,
+    title,
+    managedTab,
+    runHerdr,
+  });
+
+  // A synthetic idle row keeps indexed chats visible without running a TUI.
+  if (!pane.agent && !pane.agent_session) {
+    reportPlaceholder(pane.pane_id);
+    pane.agent = PLACEHOLDER_AGENT;
+    pane.agent_status = "idle";
+  }
+}
+
+export function reportThreadPaneMetadata({
+  pane,
+  thread,
+  title = threadTitle(thread),
+  managedTab,
+  runHerdr,
+}) {
   if (pane.label !== "Codex") {
     runHerdr(["pane", "rename", pane.pane_id, "Codex"]);
     pane.label = "Codex";
@@ -454,13 +477,6 @@ function markPane({
     [THREAD_TOKEN]: thread.id,
     ...(managedTab ? { [MANAGED_TAB_TOKEN]: "1" } : {}),
   };
-
-  // A synthetic idle row keeps indexed chats visible without running a TUI.
-  if (!pane.agent && !pane.agent_session) {
-    reportPlaceholder(pane.pane_id);
-    pane.agent = PLACEHOLDER_AGENT;
-    pane.agent_status = "idle";
-  }
 }
 
 function paneMetadataArgs(pane, thread, title, managedTab) {

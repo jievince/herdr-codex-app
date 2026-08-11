@@ -1,5 +1,6 @@
 import { ensureCodexAppServer } from "./codex-client.mjs";
 import { requestInitialSync } from "./initial-sync-core.mjs";
+import { recoverFocusedHistoryThread } from "./focus-recovery.mjs";
 import {
   PLACEHOLDER_AGENT,
   PLACEHOLDER_SOURCE,
@@ -48,7 +49,20 @@ async function handleFocus(targetPaneId) {
   const config = loadConfig();
   const paneResponse = runHerdr(["pane", "get", targetPaneId]);
   const pane = paneResponse?.result?.pane;
-  const threadId = pane?.tokens?.codex_thread_id;
+  let threadId = pane?.tokens?.codex_thread_id;
+  if (!threadId) {
+    const recovered = await recoverFocusedHistoryThread({
+      pane,
+      config,
+      runHerdr,
+    });
+    threadId = recovered?.id;
+    if (threadId) {
+      process.stdout.write(
+        `Recovered Codex chat ${threadId} from legacy history metadata.\n`,
+      );
+    }
+  }
 
   if (threadId) {
     await touchThread(threadId, pane);

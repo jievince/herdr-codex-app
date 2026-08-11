@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.10 - 2026-08-11
+
+- Recover legacy history tabs on focus when exact project and title metadata
+  identify one Codex chat.
+- Keep recovered legacy tabs outside automatic deletion ownership.
+
 ## 0.1.9 - 2026-08-11
 
 - Safely prune managed duplicate placeholders even when an older sync placed
