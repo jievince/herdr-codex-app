@@ -174,6 +174,46 @@ test("prunes a duplicate managed placeholder but preserves the chosen tab", () =
   assert.equal(second.finalState.threads.a1.tabId, "w1:t1");
 });
 
+test("prunes a managed duplicate placed in the wrong project workspace", () => {
+  const fake = createFakeHerdr();
+  const threads = [thread("a1", "/project/a", 100)];
+  const first = sync(fake, threads);
+  fake.state.workspaces.push({
+    workspace_id: "w2",
+    label: "b",
+    tokens: { herdr_codex_app: "1" },
+  });
+  fake.state.tabs.push({
+    tab_id: "w2:t1",
+    workspace_id: "w2",
+    label: "Thread a1",
+    number: 1,
+  });
+  fake.state.panes.push({
+    pane_id: "w2:p1",
+    workspace_id: "w2",
+    tab_id: "w2:t1",
+    cwd: "/project/b",
+    label: "Codex",
+    focused: false,
+    agent: "codex-history",
+    agent_status: "idle",
+    tokens: {
+      codex_thread_id: "a1",
+      herdr_codex_app: "1",
+      herdr_codex_app_managed_tab: "1",
+    },
+  });
+
+  const second = sync(fake, threads, first.finalState);
+
+  assert.equal(second.prunedWorkspaces, 1);
+  assert.deepEqual(fake.state.workspaces.map((item) => item.workspace_id), [
+    "w1",
+  ]);
+  assert.equal(second.finalState.threads.a1.workspaceId, "w1");
+});
+
 test("reuses a project workspace without taking ownership of its user tab", () => {
   const fake = createFakeHerdr(userWorkspace());
   const result = sync(fake, [thread("a1", "/project/a", 100)]);

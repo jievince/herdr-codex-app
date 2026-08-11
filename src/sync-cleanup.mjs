@@ -17,11 +17,8 @@ import {
 export function duplicatePlaceholderCandidates({ topology, finalThreads }) {
   const duplicates = [];
   for (const [threadId, record] of Object.entries(finalThreads)) {
-    for (const placement of findThreadPlacements(
-      topology,
-      threadId,
-      record.cwd,
-    )) {
+    // Wrong-workspace duplicates are still removable when ownership is live.
+    for (const placement of findThreadPlacements(topology, threadId)) {
       if (samePlacement(record, {
         workspaceId: placement.workspace.workspace_id,
         tabId: placement.tab.tab_id,

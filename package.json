@@ -1,6 +1,6 @@
 {
   "name": "herdr-codex-app",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Turn Herdr into a terminal-first Codex app: sync projects, resume chats.",
   "type": "module",

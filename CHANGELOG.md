@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.9 - 2026-08-11
+
+- Safely prune managed duplicate placeholders even when an older sync placed
+  them in the wrong project workspace.
+
 ## 0.1.8 - 2026-08-11
 
 - Isolate persisted topology and runtime locks by Herdr session.
