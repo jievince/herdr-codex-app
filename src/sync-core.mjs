@@ -26,7 +26,10 @@ import {
   findThreadPlacement,
   findStoredThreadPlacement,
   loadTopology,
+  panesForTab,
+  placementForPane,
   placementIsManaged,
+  placementMatchesCwd,
   samePlacement,
   workspaceMatchesCwd,
 } from "./sync-topology.mjs";
@@ -40,13 +43,22 @@ export function synchronizeThreadTopology({
   directoryExists = isDirectory,
 }) {
   const topology = loadTopology(runHerdr);
-  const usedLabels = new Set(
-    topology.workspaces.map((workspace) => workspace.label),
-  );
   const { selected, skippedMissingDirectories } = selectRecentThreads(
     allThreads,
     config,
     directoryExists,
+  );
+  const selectedIds = new Set(selected.map((thread) => thread.id));
+  const repairedMetadata = repairMissingThreadMetadata({
+    allThreads,
+    topology,
+    initialState,
+    selectedIds,
+    runHerdr,
+    reportPlaceholder,
+  });
+  const usedLabels = new Set(
+    topology.workspaces.map((workspace) => workspace.label),
   );
   const indexed = indexSelectedThreads({
     selected,
@@ -67,7 +79,7 @@ export function synchronizeThreadTopology({
   const stale = classifyStaleThreads({
     topology,
     initialState,
-    selectedIds: new Set(selected.map((thread) => thread.id)),
+    selectedIds,
   });
   const cleanup = pruneSafeStalePlaceholders({
     topology,
@@ -87,6 +99,7 @@ export function synchronizeThreadTopology({
       projects,
       threads: indexed.finalThreads,
     },
+    repairedMetadata,
     selectedCount: selected.length,
     createdProjects: indexed.createdProjects,
     createdTabs: indexed.createdTabs,
@@ -100,6 +113,96 @@ export function synchronizeThreadTopology({
       (item) => !cleanup.removedThreadIds.has(item.threadId),
     ).length,
   };
+}
+
+export function repairMissingThreadMetadata({
+  allThreads,
+  topology,
+  initialState,
+  selectedIds,
+  runHerdr,
+  reportPlaceholder,
+}) {
+  const restoredBySelectedState = new Set();
+  for (const threadId of selectedIds) {
+    const placement = findStoredThreadPlacement(
+      topology,
+      initialState.threads[threadId],
+    );
+    if (placement) {
+      restoredBySelectedState.add(placement.pane.pane_id);
+    }
+  }
+
+  const threadsBySignature = new Map();
+  for (const thread of allThreads) {
+    if (thread.ephemeral === true) {
+      continue;
+    }
+    const signature = historySignature(thread.cwd, threadTitle(thread));
+    if (!signature) {
+      continue;
+    }
+    appendGrouped(threadsBySignature, signature, thread);
+  }
+
+  const panesBySignature = new Map();
+  for (const pane of topology.panesById.values()) {
+    if (
+      pane.tokens?.[THREAD_TOKEN] ||
+      restoredBySelectedState.has(pane.pane_id) ||
+      pane.label !== "Codex" ||
+      (pane.agent && pane.agent !== PLACEHOLDER_AGENT) ||
+      pane.agent_session
+    ) {
+      continue;
+    }
+    const placement = placementForPane(topology, pane);
+    if (
+      !placement ||
+      panesForTab(topology, pane.tab_id).length !== 1 ||
+      !placementMatchesCwd(placement, pane.cwd)
+    ) {
+      continue;
+    }
+    const signature = historySignature(pane.cwd, placement.tab.label);
+    if (signature) {
+      appendGrouped(panesBySignature, signature, placement);
+    }
+  }
+
+  let repaired = 0;
+  for (const [signature, placements] of panesBySignature) {
+    const threads = threadsBySignature.get(signature) || [];
+    if (placements.length !== 1 || threads.length !== 1) {
+      continue;
+    }
+    // Repaired user tabs gain resumability, never plugin deletion ownership.
+    markPane({
+      pane: placements[0].pane,
+      thread: threads[0],
+      title: placements[0].tab.label,
+      managedTab: false,
+      runHerdr,
+      reportPlaceholder,
+    });
+    repaired += 1;
+  }
+  return repaired;
+}
+
+function historySignature(cwd, title) {
+  const normalized = normalizeCwd(cwd);
+  if (!normalized || typeof title !== "string" || title.length === 0) {
+    return null;
+  }
+  return `${normalized}\u0000${title}`;
+}
+
+function appendGrouped(groups, key, value) {
+  const items = groups.get(key) || [];
+  items.push(value);
+  groups.set(key, items);
 }
 
 export function mergeSynchronizedState(current, initial, synchronized) {

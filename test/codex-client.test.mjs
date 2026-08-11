@@ -16,6 +16,9 @@ test("lists Codex threads with documented pagination and filters", async () => {
     const threads = await listCodexThreads({
       maxThreads: 3,
       sourceKinds: ["cli", "appServer"],
+      cwd: ["/project/a", "/project/b"],
+      searchTerm: "chat",
+      useStateDbOnly: true,
       requestTimeoutMs: 1_000,
     });
 
@@ -39,6 +42,9 @@ test("lists Codex threads with documented pagination and filters", async () => {
           sortDirection: "desc",
           sourceKinds: ["cli", "appServer"],
           archived: false,
+          cwd: ["/project/a", "/project/b"],
+          searchTerm: "chat",
+          useStateDbOnly: true,
         },
         {
           cursor: "page-2",
@@ -47,6 +53,9 @@ test("lists Codex threads with documented pagination and filters", async () => {
           sortDirection: "desc",
           sourceKinds: ["cli", "appServer"],
           archived: false,
+          cwd: ["/project/a", "/project/b"],
+          searchTerm: "chat",
+          useStateDbOnly: true,
         },
       ],
     );

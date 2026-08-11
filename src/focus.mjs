@@ -1,16 +1,14 @@
 import { ensureCodexAppServer } from "./codex-client.mjs";
 import { requestInitialSync } from "./initial-sync-core.mjs";
-import { recoverFocusedHistoryThread } from "./focus-recovery.mjs";
 import {
   PLACEHOLDER_AGENT,
   PLACEHOLDER_SOURCE,
 } from "./constants.mjs";
 import {
-  codexTuiResumesThread,
   enforceActiveTuiLimit,
   gracefullyParkManagedPane,
   isStandaloneCodexTuiProcessInfo,
-  listAllPanes,
+  listAllAgents,
 } from "./lru.mjs";
 import {
   codexAgentName,
@@ -46,31 +44,19 @@ async function handleFocus(targetPaneId) {
     return;
   }
 
-  const config = loadConfig();
   const paneResponse = runHerdr(["pane", "get", targetPaneId]);
   const pane = paneResponse?.result?.pane;
-  let threadId = pane?.tokens?.codex_thread_id;
+  const threadId = pane?.tokens?.codex_thread_id;
   if (!threadId) {
-    const recovered = await recoverFocusedHistoryThread({
-      pane,
-      config,
-      runHerdr,
-    });
-    threadId = recovered?.id;
-    if (threadId) {
-      process.stdout.write(
-        `Recovered Codex chat ${threadId} from legacy history metadata.\n`,
-      );
-    }
+    // Missing metadata is repaired by startup/manual sync, never on focus.
+    return;
   }
 
-  if (threadId) {
-    await touchThread(threadId, pane);
-  }
+  const config = loadConfig();
+  await touchThread(threadId, pane);
 
   let migrated = false;
   if (
-    threadId &&
     pane.agent === "codex" &&
     (pane.agent_status === "idle" || pane.agent_status === "done") &&
     isStandaloneCodexTui(targetPaneId)
@@ -94,7 +80,6 @@ async function handleFocus(targetPaneId) {
 
   if (
     !migrated &&
-    threadId &&
     (!pane.agent || pane.agent === PLACEHOLDER_AGENT)
   ) {
     const runningPaneId = findRunningThreadPane(threadId, targetPaneId);
@@ -114,6 +99,7 @@ async function handleFocus(targetPaneId) {
     }
   }
 
+  // The soft LRU never queues a focus hook behind an existing eviction pass.
   const lruResult = await withLock(
     "lru",
     () =>
@@ -121,7 +107,7 @@ async function handleFocus(targetPaneId) {
         maxActiveTuis: config.maxActiveTuis,
         protectedPaneId: targetPaneId,
       }),
-    { waitMs: 5_000 },
+    { waitMs: 0 },
   );
   if (lruResult?.skipped) {
     process.stderr.write(
@@ -131,30 +117,20 @@ async function handleFocus(targetPaneId) {
 }
 
 function findRunningThreadPane(threadId, targetPaneId) {
-  for (const candidate of listAllPanes()) {
+  for (const candidate of listAllAgents()) {
     if (
       candidate.pane_id === targetPaneId ||
       candidate.agent !== "codex"
     ) {
       continue;
     }
+    if (candidate.tokens?.codex_thread_id === threadId) {
+      return candidate.pane_id;
+    }
+    // Herdr's session report covers current Codex panes not created by this plugin.
     if (
       candidate.agent_session?.agent === "codex" &&
       candidate.agent_session.value === threadId
-    ) {
-      return candidate.pane_id;
-    }
-    const response = runHerdr([
-      "pane",
-      "process-info",
-      "--pane",
-      candidate.pane_id,
-    ]);
-    if (
-      codexTuiResumesThread(
-        response?.result?.process_info,
-        threadId,
-      )
     ) {
       return candidate.pane_id;
     }

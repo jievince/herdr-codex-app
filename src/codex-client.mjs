@@ -33,6 +33,9 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 export async function listCodexThreads({
   maxThreads,
   sourceKinds,
+  cwd,
+  searchTerm,
+  useStateDbOnly = false,
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 }) {
   const client = new CodexAppServerClient({ requestTimeoutMs });
@@ -50,6 +53,9 @@ export async function listCodexThreads({
         sortDirection: "desc",
         sourceKinds,
         archived: false,
+        ...(cwd ? { cwd } : {}),
+        ...(searchTerm ? { searchTerm } : {}),
+        ...(useStateDbOnly ? { useStateDbOnly: true } : {}),
       });
       threads.push(...(result.data || []));
       cursor = result.nextCursor || null;

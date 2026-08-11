@@ -1,6 +1,6 @@
 id = "jievince.herdr-codex-app"
 name = "Herdr Codex App"
-version = "0.1.10"
+version = "0.1.11"
 min_herdr_version = "0.7.5"
 description = "Turn Herdr into a terminal-first Codex app: sync projects, resume chats."
 platforms = ["linux"]

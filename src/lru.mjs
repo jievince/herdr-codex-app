@@ -40,7 +40,7 @@ export async function enforceActiveTuiLimit({
   protectedPaneId,
 }) {
   const state = loadState();
-  const panes = listAllPanes();
+  const panes = listAllAgents();
   const plan = planLruEvictions({
     panes,
     state,
@@ -116,41 +116,9 @@ export function isStandaloneCodexTuiProcessInfo(processInfo) {
   });
 }
 
-export function codexTuiResumesThread(processInfo, threadId) {
-  const processes = processInfo?.foreground_processes;
-  if (!Array.isArray(processes) || typeof threadId !== "string") {
-    return false;
-  }
-  return processes.some((process) => {
-    if (!Array.isArray(process.argv) || process.argv.length === 0) {
-      return false;
-    }
-    const executable = path.basename(
-      process.argv0 || process.argv[0] || process.name || "",
-    );
-    // A resume process owns the thread only when the exact thread ID is an argv item.
-    return (
-      executable === "codex" &&
-      process.argv.includes("resume") &&
-      process.argv.includes(threadId)
-    );
-  });
-}
-
-export function listAllPanes() {
-  const workspaceResponse = runHerdr(["workspace", "list"]);
-  const workspaces = workspaceResponse?.result?.workspaces || [];
-  const panes = [];
-  for (const workspace of workspaces) {
-    const paneResponse = runHerdr([
-      "pane",
-      "list",
-      "--workspace",
-      workspace.workspace_id,
-    ]);
-    panes.push(...(paneResponse?.result?.panes || []));
-  }
-  return panes;
+export function listAllAgents() {
+  const response = runHerdr(["agent", "list"]);
+  return response?.result?.agents || [];
 }
 
 export async function gracefullyParkManagedPane(

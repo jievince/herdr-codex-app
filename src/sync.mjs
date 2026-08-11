@@ -28,9 +28,11 @@ try {
 async function synchronize() {
   const config = loadConfig();
   const initialState = loadStateForSync();
+  // Startup/action sync owns index convergence; focus must never scan history.
   const allThreads = await listCodexThreads({
-    maxThreads: Math.min(config.maxIndexedChats * 5, 500),
+    maxThreads: 500,
     sourceKinds: config.sourceKinds,
+    useStateDbOnly: true,
   });
   const synchronized = synchronizeThreadTopology({
     allThreads,
@@ -47,6 +49,7 @@ async function synchronize() {
   process.stdout.write(
     [
       `Codex chats refreshed: ${synchronized.selectedCount}`,
+      `metadata repaired: ${synchronized.repairedMetadata}`,
       `projects created: ${synchronized.createdProjects}`,
       `tabs created: ${synchronized.createdTabs}`,
       `titles updated: ${synchronized.updatedTabs}`,

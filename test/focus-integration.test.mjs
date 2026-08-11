@@ -32,6 +32,15 @@ test("focus resumes a placeholder through the shared app server", () => {
     assert.deepEqual(fixture.codexCalls, [
       ["app-server", "daemon", "start"],
     ]);
+    assert.equal(
+      fixture.herdrCalls.some(
+        (args) =>
+          (args[0] === "workspace" && args[1] === "list") ||
+          (args[0] === "pane" && args[1] === "list") ||
+          (args[0] === "pane" && args[1] === "process-info"),
+      ),
+      false,
+    );
     assert.ok(
       fixture.herdrCalls.some(
         (args) =>
@@ -63,8 +72,7 @@ test("focus redirects to an existing TUI for the same thread", () => {
         focused: false,
         agent: "codex",
         agent_status: "working",
-        processArgv: ["codex", "resume", "thread1"],
-        tokens: {},
+        tokens: { codex_thread_id: "thread1" },
       },
     ],
   });
@@ -141,12 +149,40 @@ test("focus does not resume a chat while history refresh holds the sync lock", (
   }
 });
 
+test("focus leaves an unindexed pane to the startup sync", () => {
+  const fixture = runFocus({
+    agent: null,
+    agentStatus: "unknown",
+    processArgv: [],
+    threadId: null,
+  });
+  try {
+    assert.equal(fixture.result.status, 0, fixture.result.stderr);
+    assert.deepEqual(fixture.codexCalls, []);
+    assert.equal(
+      fixture.herdrCalls.some(
+        (args) => args[0] === "agent" && args[1] === "list",
+      ),
+      false,
+    );
+    assert.equal(
+      fixture.herdrCalls.some(
+        (args) => args[0] === "agent" && args[1] === "start",
+      ),
+      false,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 function runFocus({
   agent,
   agentStatus,
   processArgv,
   otherPanes = [],
   syncLocked = false,
+  threadId = "thread1",
 }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "herdr-csi-focus-"));
   const pluginStateRoot = path.join(root, "plugin-state");
@@ -194,7 +230,7 @@ function runFocus({
           focused: true,
           agent,
           agent_status: agentStatus,
-          tokens: { codex_thread_id: "thread1" },
+          tokens: threadId ? { codex_thread_id: threadId } : {},
         },
         ...otherPanes,
       ],
@@ -205,14 +241,14 @@ function runFocus({
     `${JSON.stringify({
       version: 4,
       projects: {},
-      threads: {
-        thread1: {
+      threads: threadId ? {
+        [threadId]: {
           paneId: "w1:p1",
           workspaceId: "w1",
           tabId: "w1:t1",
           lastFocusedAt: 0,
         },
-      },
+      } : {},
     })}\n`,
   );
   if (syncLocked) {
@@ -290,6 +326,8 @@ if (args[0] === "workspace" && args[1] === "list") {
   respond({ workspaces: state.workspaces });
 } else if (args[0] === "pane" && args[1] === "list") {
   respond({ panes: state.panes });
+} else if (args[0] === "agent" && args[1] === "list") {
+  respond({ agents: state.panes.filter((pane) => pane.agent) });
 } else if (args[0] === "pane" && args[1] === "get") {
   respond({ pane: state.panes.find((pane) => pane.pane_id === args[2]) || null });
 } else if (args[0] === "pane" && args[1] === "list") {

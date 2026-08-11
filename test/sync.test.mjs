@@ -117,6 +117,98 @@ test("cold restart restores metadata without duplicating tabs", () => {
   assert.ok(fake.state.panes.every((pane) => pane.agent === "codex-history"));
 });
 
+test("startup sync repairs one exact legacy history tab", () => {
+  const fake = createFakeHerdr({
+    workspaces: [{ workspace_id: "w1", label: "a", tokens: {} }],
+    tabs: [
+      {
+        tab_id: "w1:t1",
+        workspace_id: "w1",
+        label: "Thread old",
+        number: 1,
+      },
+    ],
+    panes: [
+      {
+        pane_id: "w1:p1",
+        workspace_id: "w1",
+        tab_id: "w1:t1",
+        cwd: "/project/a",
+        label: "Codex",
+        focused: false,
+        agent: null,
+        agent_status: "unknown",
+        tokens: {},
+      },
+    ],
+  });
+
+  const result = sync(
+    fake,
+    [
+      thread("new", "/project/a", 200),
+      thread("old", "/project/a", 100),
+    ],
+    undefined,
+    { ...config, maxIndexedChats: 1 },
+  );
+
+  assert.equal(result.repairedMetadata, 1);
+  assert.equal(fake.state.panes[0].tokens.codex_thread_id, "old");
+  assert.equal(
+    fake.state.panes[0].tokens.herdr_codex_app_managed_tab,
+    undefined,
+  );
+  assert.equal(fake.state.panes[0].agent, "codex-history");
+  assert.equal(result.finalState.threads.old.managedTab, false);
+  assert.ok(result.finalState.threads.new);
+
+  const second = sync(
+    fake,
+    [
+      thread("new", "/project/a", 200),
+      thread("old", "/project/a", 100),
+    ],
+    result.finalState,
+    { ...config, maxIndexedChats: 1 },
+  );
+  assert.equal(second.repairedMetadata, 0);
+});
+
+test("startup sync refuses ambiguous legacy history metadata", () => {
+  const fake = createFakeHerdr({
+    workspaces: [{ workspace_id: "w1", label: "a", tokens: {} }],
+    tabs: [
+      {
+        tab_id: "w1:t1",
+        workspace_id: "w1",
+        label: "Same title",
+        number: 1,
+      },
+    ],
+    panes: [
+      {
+        pane_id: "w1:p1",
+        workspace_id: "w1",
+        tab_id: "w1:t1",
+        cwd: "/project/a",
+        label: "Codex",
+        focused: false,
+        agent: null,
+        agent_status: "unknown",
+        tokens: {},
+      },
+    ],
+  });
+  const left = { ...thread("left", "/project/a", 200), name: "Same title" };
+  const right = { ...thread("right", "/project/a", 100), name: "Same title" };
+
+  const result = sync(fake, [left, right]);
+
+  assert.equal(result.repairedMetadata, 0);
+  assert.equal(fake.state.panes[0].tokens.codex_thread_id, undefined);
+});
+
 test("does not reuse a stored workspace id from another session", () => {
   const fake = createFakeHerdr(userWorkspace("/project/b"));
   const initialState = {

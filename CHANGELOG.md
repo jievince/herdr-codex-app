@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.11 - 2026-08-11
+
+- Repair missing chat metadata during startup and manual sync instead of on
+  pane focus.
+- Build the chat index from the Codex state database without scanning rollout
+  files.
+- Use Herdr's global Agent index for duplicate detection and active-TUI LRU.
+
 ## 0.1.10 - 2026-08-11
 
 - Recover legacy history tabs on focus when exact project and title metadata
