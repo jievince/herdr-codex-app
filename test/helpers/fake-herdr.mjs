@@ -137,6 +137,27 @@ export function createFakeHerdr(initial = {}) {
         pane: state.panes.find((item) => item.pane_id === args[2]) || null,
       });
     }
+    if (group === "pane" && command === "process-info") {
+      const paneId = valueAfter(args, "--pane");
+      const pane = requireItem(state.panes, "pane_id", paneId);
+      const shellPid = 10_000 + Number(paneId.match(/\d+/g)?.at(-1) || 1);
+      const foregroundPid = pane.busy ? shellPid + 1 : shellPid;
+      return response({
+        process_info: {
+          pane_id: paneId,
+          shell_pid: shellPid,
+          foreground_process_group_id: foregroundPid,
+          foreground_processes: [
+            {
+              pid: foregroundPid,
+              name: pane.busy ? "test" : "sh",
+              argv: [pane.busy ? "test" : "sh"],
+              cwd: pane.cwd,
+            },
+          ],
+        },
+      });
+    }
     if (group === "pane" && command === "rename") {
       requireItem(state.panes, "pane_id", args[2]).label = args[3];
       return response({});

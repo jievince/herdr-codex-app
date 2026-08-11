@@ -209,6 +209,36 @@ test("startup sync refuses ambiguous legacy history metadata", () => {
   assert.equal(fake.state.panes[0].tokens.codex_thread_id, undefined);
 });
 
+test("startup sync prunes a proven cross-project legacy duplicate", () => {
+  const fake = misplacedLegacyFixture();
+  const moved = {
+    ...thread("moved", "/project/right", 100),
+    name: "Moved chat",
+  };
+
+  const result = sync(fake, [moved]);
+
+  assert.equal(result.prunedTabs, 1);
+  assert.equal(
+    fake.state.tabs.some((tab) => tab.tab_id === "w1:t1"),
+    false,
+  );
+  assert.ok(fake.state.tabs.some((tab) => tab.tab_id === "w2:t1"));
+});
+
+test("startup sync keeps a misplaced legacy tab with a busy foreground", () => {
+  const fake = misplacedLegacyFixture({ busy: true });
+  const moved = {
+    ...thread("moved", "/project/right", 100),
+    name: "Moved chat",
+  };
+
+  const result = sync(fake, [moved]);
+
+  assert.equal(result.prunedTabs, 0);
+  assert.ok(fake.state.tabs.some((tab) => tab.tab_id === "w1:t1"));
+});
+
 test("does not reuse a stored workspace id from another session", () => {
   const fake = createFakeHerdr(userWorkspace("/project/b"));
   const initialState = {
@@ -520,4 +550,81 @@ function thread(id, cwd, recencyAt) {
     name: `Thread ${id}`,
     source: "cli",
   };
+}
+
+function misplacedLegacyFixture({ busy = false } = {}) {
+  return createFakeHerdr({
+    workspaces: [
+      {
+        workspace_id: "w1",
+        label: "wrong",
+        tokens: { herdr_codex_app: "1" },
+      },
+      {
+        workspace_id: "w2",
+        label: "right",
+        tokens: { herdr_codex_app: "1" },
+      },
+    ],
+    tabs: [
+      {
+        tab_id: "w1:t1",
+        workspace_id: "w1",
+        label: "Moved chat",
+        number: 1,
+      },
+      {
+        tab_id: "w1:t2",
+        workspace_id: "w1",
+        label: "Keep",
+        number: 2,
+      },
+      {
+        tab_id: "w2:t1",
+        workspace_id: "w2",
+        label: "Moved chat",
+        number: 1,
+      },
+    ],
+    panes: [
+      {
+        pane_id: "w1:p1",
+        workspace_id: "w1",
+        tab_id: "w1:t1",
+        cwd: "/project/wrong",
+        label: "Codex",
+        focused: false,
+        agent: null,
+        agent_status: "unknown",
+        tokens: {},
+        busy,
+      },
+      {
+        pane_id: "w1:p2",
+        workspace_id: "w1",
+        tab_id: "w1:t2",
+        cwd: "/project/wrong",
+        label: "shell",
+        focused: false,
+        agent: null,
+        agent_status: "unknown",
+        tokens: {},
+      },
+      {
+        pane_id: "w2:p1",
+        workspace_id: "w2",
+        tab_id: "w2:t1",
+        cwd: "/project/right",
+        label: "Codex",
+        focused: false,
+        agent: "codex-history",
+        agent_status: "idle",
+        tokens: {
+          codex_thread_id: "moved",
+          herdr_codex_app: "1",
+          herdr_codex_app_managed_tab: "1",
+        },
+      },
+    ],
+  });
 }

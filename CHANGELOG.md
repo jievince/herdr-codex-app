@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.12 - 2026-08-11
+
+- Prune legacy chat tabs placed in the wrong project only when the correct
+  indexed chat exists and the stale pane is an available shell.
+
 ## 0.1.11 - 2026-08-11
 
 - Repair missing chat metadata during startup and manual sync instead of on

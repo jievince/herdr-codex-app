@@ -4,7 +4,7 @@ import {
   PLACEHOLDER_AGENT,
   THREAD_TOKEN,
 } from "./constants.mjs";
-import { normalizeCwd } from "./lib.mjs";
+import { normalizeCwd, threadTitle } from "./lib.mjs";
 import {
   findThreadPlacement,
   findThreadPlacements,
@@ -133,6 +133,55 @@ export function pruneSafeStalePlaceholders({ topology, stale, runHerdr }) {
     prunedTabs,
     prunedWorkspaces,
   };
+}
+
+export function pruneMisplacedLegacyTabs({
+  topology,
+  allThreads,
+  finalThreads,
+  runHerdr,
+}) {
+  const threadsByTitle = new Map();
+  for (const thread of allThreads) {
+    if (thread.ephemeral === true || !normalizeCwd(thread.cwd)) {
+      continue;
+    }
+    appendGrouped(threadsByTitle, threadTitle(thread), thread);
+  }
+
+  let prunedTabs = 0;
+  for (const pane of topology.panesById.values()) {
+    const placement = placementForPane(topology, pane);
+    const matches = placement
+      ? threadsByTitle.get(placement.tab.label) || []
+      : [];
+    if (
+      !placement ||
+      matches.length !== 1 ||
+      !isUnindexedLegacyPane(topology, placement) ||
+      placement.workspace.tokens?.[MANAGED_TOKEN] !== "1"
+    ) {
+      continue;
+    }
+
+    const thread = matches[0];
+    const correct = finalThreads[thread.id];
+    if (
+      !correct ||
+      normalizeCwd(thread.cwd) === normalizeCwd(pane.cwd) ||
+      normalizeCwd(correct.cwd) !== normalizeCwd(thread.cwd) ||
+      correct.workspaceId === placement.workspace.workspace_id ||
+      correct.paneId === pane.pane_id
+    ) {
+      continue;
+    }
+
+    if (verifyMisplacedLegacyTab(placement, thread, correct, runHerdr)) {
+      runHerdr(["tab", "close", placement.tab.tab_id]);
+      prunedTabs += 1;
+    }
+  }
+  return { prunedTabs };
 }
 
 export function retainedThreadRecord(item) {
@@ -286,4 +335,80 @@ function paneStillSafe(item, runHerdr) {
     return false;
   }
   return pane.tokens?.[MANAGED_TAB_TOKEN] === "1";
+}
+
+function isUnindexedLegacyPane(topology, placement) {
+  const pane = placement.pane;
+  return (
+    pane.label === "Codex" &&
+    !pane.tokens?.[THREAD_TOKEN] &&
+    !pane.agent &&
+    !pane.agent_session &&
+    pane.focused !== true &&
+    panesForTab(topology, placement.tab.tab_id).length === 1
+  );
+}
+
+function verifyMisplacedLegacyTab(placement, thread, correct, runHerdr) {
+  const workspaceId = placement.workspace.workspace_id;
+  const workspace = runHerdr(["workspace", "get", workspaceId])?.result
+    ?.workspace;
+  const tab = runHerdr(["tab", "get", placement.tab.tab_id])?.result?.tab;
+  const tabs =
+    runHerdr(["tab", "list", "--workspace", workspaceId])?.result?.tabs || [];
+  const panes =
+    runHerdr(["pane", "list", "--workspace", workspaceId])?.result?.panes || [];
+  const pane = panes.find(
+    (candidate) => candidate.pane_id === placement.pane.pane_id,
+  );
+  const correctPane = runHerdr(["pane", "get", correct.paneId])?.result?.pane;
+  const processInfo = runHerdr([
+    "pane",
+    "process-info",
+    "--pane",
+    placement.pane.pane_id,
+  ])?.result?.process_info;
+
+  if (
+    workspace?.tokens?.[MANAGED_TOKEN] !== "1" ||
+    !tab ||
+    tab.workspace_id !== workspaceId ||
+    tab.label !== placement.tab.label ||
+    tabs.length <= 1 ||
+    panes.filter((candidate) => candidate.tab_id === tab.tab_id).length !== 1 ||
+    !pane ||
+    pane.label !== "Codex" ||
+    pane.tokens?.[THREAD_TOKEN] ||
+    pane.agent ||
+    pane.agent_session ||
+    pane.focused === true ||
+    normalizeCwd(pane.cwd) === normalizeCwd(thread.cwd) ||
+    correctPane?.tokens?.[THREAD_TOKEN] !== thread.id ||
+    normalizeCwd(correctPane.cwd) !== normalizeCwd(thread.cwd) ||
+    !isAvailableShell(processInfo)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function isAvailableShell(processInfo) {
+  const shellPid = Number(processInfo?.shell_pid);
+  const foregroundGroup = Number(processInfo?.foreground_process_group_id);
+  const processes = processInfo?.foreground_processes;
+  // Closing is safe only when the shell itself is the sole foreground process.
+  return (
+    Number.isInteger(shellPid) &&
+    shellPid > 0 &&
+    foregroundGroup === shellPid &&
+    Array.isArray(processes) &&
+    processes.length === 1 &&
+    Number(processes[0]?.pid) === shellPid
+  );
+}
+
+function appendGrouped(groups, key, value) {
+  const items = groups.get(key) || [];
+  items.push(value);
+  groups.set(key, items);
 }

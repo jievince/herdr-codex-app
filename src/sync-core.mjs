@@ -19,6 +19,7 @@ import {
   classifyStaleThreads,
   duplicatePlaceholderCandidates,
   projectStateForThreads,
+  pruneMisplacedLegacyTabs,
   pruneSafeStalePlaceholders,
   retainedThreadRecord,
 } from "./sync-cleanup.mjs";
@@ -92,6 +93,12 @@ export function synchronizeThreadTopology({
     initialState,
     topology,
   });
+  const misplacedCleanup = pruneMisplacedLegacyTabs({
+    topology,
+    allThreads,
+    finalThreads: indexed.finalThreads,
+    runHerdr,
+  });
 
   return {
     finalState: {
@@ -105,7 +112,10 @@ export function synchronizeThreadTopology({
     createdTabs: indexed.createdTabs,
     updatedTabs: indexed.updatedTabs,
     skippedMissingDirectories,
-    prunedTabs: cleanup.prunedTabs + duplicateCleanup.prunedTabs,
+    prunedTabs:
+      cleanup.prunedTabs +
+      duplicateCleanup.prunedTabs +
+      misplacedCleanup.prunedTabs,
     prunedWorkspaces:
       cleanup.prunedWorkspaces + duplicateCleanup.prunedWorkspaces,
     removedThreadIds: cleanup.removedThreadIds,
