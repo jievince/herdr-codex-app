@@ -2,7 +2,7 @@ import { listCodexThreads } from "./codex-client.mjs";
 import { recordSyncSuccess } from "./initial-sync-core.mjs";
 import {
   loadConfig,
-  loadState,
+  loadStateForSync,
   reportPlaceholder,
   runHerdr,
   updateState,
@@ -27,7 +27,7 @@ try {
 
 async function synchronize() {
   const config = loadConfig();
-  const initialState = loadState();
+  const initialState = loadStateForSync();
   const allThreads = await listCodexThreads({
     maxThreads: Math.min(config.maxIndexedChats * 5, 500),
     sourceKinds: config.sourceKinds,

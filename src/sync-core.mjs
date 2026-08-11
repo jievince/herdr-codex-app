@@ -5,24 +5,30 @@ import {
   MANAGED_TOKEN,
   METADATA_SOURCE,
   PLACEHOLDER_AGENT,
+  PROJECT_TOKEN,
+  STATE_VERSION,
   THREAD_TOKEN,
 } from "./constants.mjs";
 import {
   normalizeCwd,
+  projectCwdToken,
   projectLabel,
   threadTitle,
 } from "./lib.mjs";
 import {
   classifyStaleThreads,
+  duplicatePlaceholderCandidates,
   projectStateForThreads,
   pruneSafeStalePlaceholders,
   retainedThreadRecord,
 } from "./sync-cleanup.mjs";
 import {
   findThreadPlacement,
+  findStoredThreadPlacement,
   loadTopology,
   placementIsManaged,
   samePlacement,
+  workspaceMatchesCwd,
 } from "./sync-topology.mjs";
 
 export function synchronizeThreadTopology({
@@ -50,6 +56,14 @@ export function synchronizeThreadTopology({
     runHerdr,
     reportPlaceholder,
   });
+  const duplicateCleanup = pruneSafeStalePlaceholders({
+    topology,
+    stale: duplicatePlaceholderCandidates({
+      topology,
+      finalThreads: indexed.finalThreads,
+    }),
+    runHerdr,
+  });
   const stale = classifyStaleThreads({
     topology,
     initialState,
@@ -69,7 +83,7 @@ export function synchronizeThreadTopology({
 
   return {
     finalState: {
-      version: 3,
+      version: STATE_VERSION,
       projects,
       threads: indexed.finalThreads,
     },
@@ -78,8 +92,9 @@ export function synchronizeThreadTopology({
     createdTabs: indexed.createdTabs,
     updatedTabs: indexed.updatedTabs,
     skippedMissingDirectories,
-    prunedTabs: cleanup.prunedTabs,
-    prunedWorkspaces: cleanup.prunedWorkspaces,
+    prunedTabs: cleanup.prunedTabs + duplicateCleanup.prunedTabs,
+    prunedWorkspaces:
+      cleanup.prunedWorkspaces + duplicateCleanup.prunedWorkspaces,
     removedThreadIds: cleanup.removedThreadIds,
     retainedStale: stale.filter(
       (item) => !cleanup.removedThreadIds.has(item.threadId),
@@ -125,7 +140,7 @@ export function mergeSynchronizedState(current, initial, synchronized) {
   for (const [cwd, project] of Object.entries(desired.projects)) {
     current.projects[cwd] = project;
   }
-  current.version = 3;
+  current.version = STATE_VERSION;
 }
 
 export function selectRecentThreads(
@@ -208,9 +223,24 @@ function indexExistingThread({
   runHerdr,
   reportPlaceholder,
 }) {
-  const placement = findThreadPlacement(topology, thread.id);
+  const previous = initialState.threads[thread.id];
+  const cwd = normalizeCwd(thread.cwd);
+  let placement = findThreadPlacement(topology, thread.id, cwd, previous);
+  let recoveredFromState = false;
+  if (!placement) {
+    placement = findStoredThreadPlacement(topology, previous);
+    recoveredFromState = placement !== null;
+  }
   if (!placement) {
     return null;
+  }
+
+  if (
+    recoveredFromState &&
+    initialState.projects[cwd]?.managed === true &&
+    placement.workspace.tokens?.[MANAGED_TOKEN] !== "1"
+  ) {
+    reportManagedWorkspace({ workspace: placement.workspace, cwd, runHerdr });
   }
 
   const title = threadTitle(thread);
@@ -222,7 +252,7 @@ function indexExistingThread({
   }
   const managedTab = placementIsManaged(
     topology,
-    initialState.threads[thread.id],
+    previous,
     placement,
   );
   markPane({
@@ -238,7 +268,7 @@ function indexExistingThread({
       thread,
       placement,
       managedTab,
-      previous: initialState.threads[thread.id],
+      previous,
     }),
     createdProject: false,
     createdTab: false,
@@ -263,7 +293,7 @@ function indexNewThread({
     usedLabels,
     runHerdr,
   });
-  const placement = allocateThreadTab(project, title, runHerdr);
+  const placement = allocateThreadTab(project, title, cwd, runHerdr);
   markPane({
     pane: placement.pane,
     thread,
@@ -299,14 +329,27 @@ function ensureProject({
   let workspace = storedWorkspace
     ? topology.workspacesById.get(storedWorkspace)
     : null;
+  if (workspace && !workspaceMatchesCwd(workspace, cwd)) {
+    workspace = null;
+  }
   if (!workspace) {
     workspace = topology.workspaces.find(
       (candidate) =>
-        candidate.tokens?.codex_project_cwd === cwd ||
-        candidate.identityCwd === cwd,
+        workspaceMatchesCwd(candidate, cwd),
     );
   }
   if (workspace) {
+    const storedProject = initialState.projects[cwd];
+    const pluginOwned =
+      workspace.tokens?.[MANAGED_TOKEN] === "1" ||
+      (storedProject?.workspaceId === workspace.workspace_id &&
+        storedProject.managed === true);
+    if (
+      pluginOwned &&
+      workspace.tokens?.[PROJECT_TOKEN] !== projectCwdToken(cwd)
+    ) {
+      reportManagedWorkspace({ workspace, cwd, runHerdr });
+    }
     return { workspace, created: false };
   }
 
@@ -351,16 +394,16 @@ function reportManagedWorkspace({ workspace, cwd, runHerdr }) {
     "--token",
     `${MANAGED_TOKEN}=1`,
     "--token",
-    `codex_project_cwd=${cwd}`,
+    `${PROJECT_TOKEN}=${projectCwdToken(cwd)}`,
   ]);
   workspace.tokens = {
     ...(workspace.tokens || {}),
     [MANAGED_TOKEN]: "1",
-    codex_project_cwd: cwd,
+    [PROJECT_TOKEN]: projectCwdToken(cwd),
   };
 }
 
-function allocateThreadTab(project, title, runHerdr) {
+function allocateThreadTab(project, title, cwd, runHerdr) {
   const workspace = project.workspace;
   if (workspace.createdRoot && !workspace.createdRoot.used) {
     workspace.createdRoot.used = true;
@@ -379,7 +422,7 @@ function allocateThreadTab(project, title, runHerdr) {
     "--workspace",
     workspace.workspace_id,
     "--cwd",
-    workspace.identityCwd,
+    cwd,
     "--label",
     title,
     "--no-focus",

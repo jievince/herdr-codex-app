@@ -8,6 +8,7 @@ import {
   recordSyncSuccess,
   requestInitialSync,
 } from "../src/initial-sync-core.mjs";
+import { stateDirectory } from "../src/lib.mjs";
 
 test("pane focus requests sync only until the first success", async () => {
   await withStateDirectory(async () => {
@@ -68,14 +69,21 @@ async function withStateDirectory(callback) {
     path.join(os.tmpdir(), "herdr-codex-app-initial-sync-"),
   );
   const previous = process.env.HERDR_PLUGIN_STATE_DIR;
+  const previousSocket = process.env.HERDR_SOCKET_PATH;
   process.env.HERDR_PLUGIN_STATE_DIR = directory;
+  process.env.HERDR_SOCKET_PATH = path.join(directory, "herdr.sock");
   try {
-    await callback(directory);
+    await callback(stateDirectory());
   } finally {
     if (previous === undefined) {
       delete process.env.HERDR_PLUGIN_STATE_DIR;
     } else {
       process.env.HERDR_PLUGIN_STATE_DIR = previous;
+    }
+    if (previousSocket === undefined) {
+      delete process.env.HERDR_SOCKET_PATH;
+    } else {
+      process.env.HERDR_SOCKET_PATH = previousSocket;
     }
     fs.rmSync(directory, { recursive: true, force: true });
   }

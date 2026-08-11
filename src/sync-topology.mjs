@@ -1,8 +1,13 @@
 import {
   MANAGED_TAB_TOKEN,
+  PLACEHOLDER_AGENT,
+  PROJECT_TOKEN,
   THREAD_TOKEN,
 } from "./constants.mjs";
-import { normalizeCwd } from "./lib.mjs";
+import {
+  normalizeCwd,
+  projectCwdToken,
+} from "./lib.mjs";
 
 export function loadTopology(runHerdr) {
   const workspaceResponse = runHerdr(["workspace", "list"]);
@@ -47,7 +52,8 @@ export function loadTopology(runHerdr) {
   return topology;
 }
 
-export function findThreadPlacement(topology, threadId) {
+export function findThreadPlacements(topology, threadId, cwd = null) {
+  const placements = [];
   for (const pane of topology.panesById.values()) {
     if (
       pane.tokens?.[THREAD_TOKEN] === threadId ||
@@ -55,14 +61,52 @@ export function findThreadPlacement(topology, threadId) {
         pane.agent_session.value === threadId)
     ) {
       const placement = placementForPane(topology, pane);
-      if (placement) {
-        return placement;
+      if (placement && (!cwd || placementMatchesCwd(placement, cwd))) {
+        placements.push(placement);
       }
     }
   }
+  return placements;
+}
 
-  // A stored pane id is not ownership proof because users can repurpose panes.
-  return null;
+export function findThreadPlacement(
+  topology,
+  threadId,
+  cwd = null,
+  preferred = null,
+) {
+  const placements = findThreadPlacements(topology, threadId, cwd);
+  if (preferred) {
+    const exact = placements.find((placement) =>
+      samePlacement(preferred, placementRecord(placement)),
+    );
+    if (exact) {
+      return exact;
+    }
+  }
+  return placements[0] || null;
+}
+
+export function findStoredThreadPlacement(topology, stored) {
+  if (stored?.managedTab !== true || !stored.title || !stored.cwd) {
+    return null;
+  }
+  const pane = topology.panesById.get(stored.paneId);
+  const placement = pane ? placementForPane(topology, pane) : null;
+  if (
+    !placement ||
+    !samePlacement(stored, placementRecord(placement)) ||
+    !placementMatchesCwd(placement, stored.cwd) ||
+    placement.tab.label !== stored.title ||
+    placement.pane.label !== "Codex" ||
+    panesForTab(topology, stored.tabId).length !== 1 ||
+    paneHasAnotherAgent(placement.pane)
+  ) {
+    return null;
+  }
+
+  // Persisted IDs are accepted only with the full durable topology signature.
+  return placement;
 }
 
 export function placementForPane(topology, pane) {
@@ -106,6 +150,53 @@ export function samePlacement(left, right) {
     left.tabId === right.tabId &&
     left.paneId === right.paneId
   );
+}
+
+export function placementMatchesCwd(placement, cwd) {
+  const expected = normalizeCwd(cwd);
+  const workspaceCwd = normalizeCwd(placement.workspace.identityCwd);
+  const paneCwd = normalizeCwd(placement.pane.cwd);
+  return (
+    expected !== null &&
+    workspaceCwd === expected &&
+    paneCwd === expected &&
+    workspaceTokenMatchesCwd(placement.workspace, expected)
+  );
+}
+
+export function workspaceMatchesCwd(workspace, cwd) {
+  const expected = normalizeCwd(cwd);
+  const identityCwd = normalizeCwd(workspace.identityCwd);
+  return (
+    expected !== null &&
+    identityCwd === expected &&
+    workspaceTokenMatchesCwd(workspace, expected)
+  );
+}
+
+function workspaceTokenMatchesCwd(workspace, cwd) {
+  const token = workspace.tokens?.[PROJECT_TOKEN];
+  if (!token) {
+    return true;
+  }
+  if (!String(token).startsWith("sha256:")) {
+    // Herdr truncated legacy raw-cwd tokens at 80 characters.
+    return true;
+  }
+  return token === projectCwdToken(cwd);
+}
+
+function placementRecord(placement) {
+  return {
+    workspaceId: placement.workspace.workspace_id,
+    tabId: placement.tab.tab_id,
+    paneId: placement.pane.pane_id,
+  };
+}
+
+function paneHasAnotherAgent(pane) {
+  const agents = [pane.agent, pane.agent_session?.agent].filter(Boolean);
+  return agents.some((agent) => agent !== PLACEHOLDER_AGENT);
 }
 
 function workspaceIdentityCwd(workspace) {

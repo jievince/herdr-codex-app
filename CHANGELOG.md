@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.8 - 2026-08-11
+
+- Isolate persisted topology and runtime locks by Herdr session.
+- Restore verified chat placeholders after a Herdr server restart without
+  duplicating tabs.
+- Reject stale cross-session workspace IDs and prune safe duplicate
+  placeholders.
+- Use bounded project identity tokens so long working directories remain
+  idempotent.
+
 ## 0.1.7 - 2026-07-31
 
 - Reframe the public tagline around the terminal-first Codex app experience.

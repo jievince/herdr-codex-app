@@ -209,7 +209,8 @@ function applyTokens(item, args) {
       continue;
     }
     const [name, ...value] = args[index + 1].split("=");
-    item.tokens[name] = value.join("=");
+    // Match Herdr's metadata token value contract.
+    item.tokens[name] = Array.from(value.join("=")).slice(0, 80).join("");
   }
 }
 

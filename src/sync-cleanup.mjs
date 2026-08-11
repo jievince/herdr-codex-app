@@ -7,10 +7,33 @@ import {
 import { normalizeCwd } from "./lib.mjs";
 import {
   findThreadPlacement,
+  findThreadPlacements,
   panesForTab,
   placementForPane,
   placementIsManaged,
+  samePlacement,
 } from "./sync-topology.mjs";
+
+export function duplicatePlaceholderCandidates({ topology, finalThreads }) {
+  const duplicates = [];
+  for (const [threadId, record] of Object.entries(finalThreads)) {
+    for (const placement of findThreadPlacements(
+      topology,
+      threadId,
+      record.cwd,
+    )) {
+      if (samePlacement(record, {
+        workspaceId: placement.workspace.workspace_id,
+        tabId: placement.tab.tab_id,
+        paneId: placement.pane.pane_id,
+      })) {
+        continue;
+      }
+      duplicates.push(stalePlacement(topology, threadId, record, placement));
+    }
+  }
+  return duplicates;
+}
 
 export function classifyStaleThreads({
   topology,
@@ -24,7 +47,12 @@ export function classifyStaleThreads({
       continue;
     }
     classifiedIds.add(threadId);
-    const placement = findThreadPlacement(topology, threadId);
+    const placement = findThreadPlacement(
+      topology,
+      threadId,
+      record.cwd,
+      record,
+    );
     if (!placement || placement.pane.tokens?.[THREAD_TOKEN] !== threadId) {
       stale.push({ threadId, record, placement: null, safeCandidate: false });
       continue;
@@ -50,9 +78,7 @@ export function classifyStaleThreads({
       continue;
     }
     const record = {
-      cwd:
-        normalizeCwd(placement.workspace.tokens?.codex_project_cwd) ||
-        normalizeCwd(pane.cwd),
+      cwd: normalizeCwd(pane.cwd),
       workspaceId: placement.workspace.workspace_id,
       tabId: placement.tab.tab_id,
       paneId: pane.pane_id,

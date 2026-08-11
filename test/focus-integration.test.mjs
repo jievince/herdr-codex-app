@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -148,14 +149,23 @@ function runFocus({
   syncLocked = false,
 }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "herdr-csi-focus-"));
-  const stateDirectory = path.join(root, "plugin-state");
+  const pluginStateRoot = path.join(root, "plugin-state");
   const configDirectory = path.join(root, "plugin-config");
+  const socketPath = path.join(root, "herdr.sock");
+  const sessionKey = createHash("sha256")
+    .update(socketPath)
+    .digest("hex");
+  const stateDirectory = path.join(
+    pluginStateRoot,
+    "sessions",
+    sessionKey,
+  );
   const runtimeStatePath = path.join(root, "runtime.json");
   const herdrLogPath = path.join(root, "herdr.log");
   const codexLogPath = path.join(root, "codex.log");
   const fakeHerdrPath = path.join(root, "fake-herdr.cjs");
   const fakeCodexPath = path.join(root, "fake-codex.cjs");
-  fs.mkdirSync(stateDirectory);
+  fs.mkdirSync(stateDirectory, { recursive: true });
   fs.mkdirSync(configDirectory);
   fs.writeFileSync(
     runtimeStatePath,
@@ -193,7 +203,7 @@ function runFocus({
   fs.writeFileSync(
     path.join(stateDirectory, "index.json"),
     `${JSON.stringify({
-      version: 3,
+      version: 4,
       projects: {},
       threads: {
         thread1: {
@@ -228,8 +238,9 @@ function runFocus({
       HERDR_BIN_PATH: fakeHerdrPath,
       HERDR_CODEX_BIN: fakeCodexPath,
       HERDR_PANE_ID: "w1:p1",
-      HERDR_PLUGIN_STATE_DIR: stateDirectory,
+      HERDR_PLUGIN_STATE_DIR: pluginStateRoot,
       HERDR_PLUGIN_CONFIG_DIR: configDirectory,
+      HERDR_SOCKET_PATH: socketPath,
       FAKE_HERDR_STATE: runtimeStatePath,
       FAKE_HERDR_LOG: herdrLogPath,
       FAKE_CODEX_LOG: codexLogPath,

@@ -142,5 +142,5 @@ function stateFor(panes) {
       };
     }
   }
-  return { version: 3, projects: {}, threads };
+  return { version: 4, projects: {}, threads };
 }

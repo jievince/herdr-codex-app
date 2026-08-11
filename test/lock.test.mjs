@@ -4,7 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { recoverStaleLock, withLock } from "../src/lib.mjs";
+import {
+  recoverStaleLock,
+  stateDirectory,
+  withLock,
+} from "../src/lib.mjs";
 
 test("does not steal an old lock while its owner is alive", async () => {
   await withTemporaryState((directory) => {
@@ -85,14 +89,21 @@ test("lock release does not delete a replacement owner", async () => {
 async function withTemporaryState(callback) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "herdr-csi-lock-"));
   const previous = process.env.HERDR_PLUGIN_STATE_DIR;
+  const previousSocket = process.env.HERDR_SOCKET_PATH;
   process.env.HERDR_PLUGIN_STATE_DIR = directory;
+  process.env.HERDR_SOCKET_PATH = path.join(directory, "herdr.sock");
   try {
-    return await callback(directory);
+    return await callback(stateDirectory());
   } finally {
     if (previous === undefined) {
       delete process.env.HERDR_PLUGIN_STATE_DIR;
     } else {
       process.env.HERDR_PLUGIN_STATE_DIR = previous;
+    }
+    if (previousSocket === undefined) {
+      delete process.env.HERDR_SOCKET_PATH;
+    } else {
+      process.env.HERDR_SOCKET_PATH = previousSocket;
     }
     fs.rmSync(directory, { recursive: true, force: true });
   }

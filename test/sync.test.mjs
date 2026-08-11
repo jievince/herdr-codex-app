@@ -64,6 +64,116 @@ test("repeated sync is idempotent", () => {
   assert.equal(fake.state.tabs.length, 2);
 });
 
+test("repeated sync is idempotent for cwd values longer than metadata tokens", () => {
+  const fake = createFakeHerdr();
+  const cwd = `/project/${"long-segment-".repeat(8)}`;
+  const threads = [thread("a1", cwd, 100)];
+  const first = sync(fake, threads);
+  const second = sync(fake, threads, first.finalState);
+
+  assert.equal(second.createdProjects, 0);
+  assert.equal(second.createdTabs, 0);
+  assert.equal(fake.state.workspaces.length, 1);
+  assert.match(
+    fake.state.workspaces[0].tokens.codex_project_key,
+    /^sha256:[a-f0-9]{64}$/,
+  );
+});
+
+test("cold restart restores metadata without duplicating tabs", () => {
+  const fake = createFakeHerdr();
+  const threads = [
+    thread("a1", "/project/a", 300),
+    thread("a2", "/project/a", 200),
+  ];
+  const first = sync(fake, threads);
+
+  for (const workspace of fake.state.workspaces) {
+    workspace.tokens = {};
+  }
+  for (const pane of fake.state.panes) {
+    pane.tokens = {};
+    pane.agent = null;
+    pane.agent_status = "unknown";
+  }
+  const callOffset = fake.calls.length;
+  const second = sync(fake, threads, first.finalState);
+  const newCalls = fake.calls.slice(callOffset);
+
+  assert.equal(second.createdProjects, 0);
+  assert.equal(second.createdTabs, 0);
+  assert.equal(fake.state.workspaces.length, 1);
+  assert.equal(fake.state.tabs.length, 2);
+  assert.equal(
+    newCalls.some((args) => args[0] === "workspace" && args[1] === "create"),
+    false,
+  );
+  assert.equal(
+    newCalls.filter(
+      (args) => args[0] === "pane" && args[1] === "report-metadata",
+    ).length,
+    2,
+  );
+  assert.ok(fake.state.panes.every((pane) => pane.agent === "codex-history"));
+});
+
+test("does not reuse a stored workspace id from another session", () => {
+  const fake = createFakeHerdr(userWorkspace("/project/b"));
+  const initialState = {
+    version: 4,
+    projects: {
+      "/project/a": { workspaceId: "w1", managed: false },
+    },
+    threads: {},
+  };
+
+  const result = sync(
+    fake,
+    [thread("a1", "/project/a", 100)],
+    initialState,
+  );
+
+  assert.equal(result.createdProjects, 1);
+  assert.equal(result.finalState.threads.a1.workspaceId, "w2");
+  assert.equal(
+    fake.state.panes.find((pane) => pane.pane_id === "w1:p1").cwd,
+    "/project/b",
+  );
+});
+
+test("prunes a duplicate managed placeholder but preserves the chosen tab", () => {
+  const fake = createFakeHerdr();
+  const threads = [thread("a1", "/project/a", 100)];
+  const first = sync(fake, threads);
+  fake.state.tabs.push({
+    tab_id: "w1:t2",
+    workspace_id: "w1",
+    label: "Thread a1",
+    number: 2,
+  });
+  fake.state.panes.push({
+    pane_id: "w1:p2",
+    workspace_id: "w1",
+    tab_id: "w1:t2",
+    cwd: "/project/a",
+    label: "Codex",
+    focused: false,
+    agent: "codex-history",
+    agent_status: "idle",
+    tokens: {
+      codex_thread_id: "a1",
+      herdr_codex_app: "1",
+      herdr_codex_app_managed_tab: "1",
+    },
+  });
+
+  const second = sync(fake, threads, first.finalState);
+
+  assert.equal(second.prunedTabs, 1);
+  assert.deepEqual(fake.state.tabs.map((tab) => tab.tab_id), ["w1:t1"]);
+  assert.equal(second.finalState.threads.a1.tabId, "w1:t1");
+});
+
 test("reuses a project workspace without taking ownership of its user tab", () => {
   const fake = createFakeHerdr(userWorkspace());
   const result = sync(fake, [thread("a1", "/project/a", 100)]);
@@ -173,7 +283,7 @@ test("revalidation prevents closing a pane focused during sync", () => {
 
 test("state merge preserves concurrent focus updates and new records", () => {
   const initial = {
-    version: 3,
+    version: 4,
     projects: {
       "/project/a": { workspaceId: "w1", managed: true },
     },
@@ -197,7 +307,7 @@ test("state merge preserves concurrent focus updates and new records", () => {
   };
   const synchronized = {
     finalState: {
-      version: 3,
+      version: 4,
       projects: structuredClone(initial.projects),
       threads: {
         a1: { ...initial.threads.a1, lastFocusedAt: 10 },
@@ -213,7 +323,7 @@ test("state merge preserves concurrent focus updates and new records", () => {
 
 test("state merge preserves a record concurrently moved to another pane", () => {
   const initial = {
-    version: 3,
+    version: 4,
     projects: {},
     threads: {
       a1: {
@@ -230,7 +340,7 @@ test("state merge preserves a record concurrently moved to another pane", () => 
     paneId: "w2:p1",
   };
   const synchronized = {
-    finalState: { version: 3, projects: {}, threads: {} },
+    finalState: { version: 4, projects: {}, threads: {} },
   };
 
   mergeSynchronizedState(current, initial, synchronized);
@@ -245,7 +355,7 @@ test("state merge preserves a record concurrently moved to another pane", () => 
 function sync(
   fake,
   allThreads,
-  initialState = { version: 3, projects: {}, threads: {} },
+  initialState = { version: 4, projects: {}, threads: {} },
   selectedConfig = config,
   directoryExists = () => true,
 ) {

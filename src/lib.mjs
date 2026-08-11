@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 import {
   PLACEHOLDER_AGENT,
   PLACEHOLDER_SOURCE,
+  STATE_VERSION,
 } from "./constants.mjs";
 
 const LOCK_STALE_MS = 120_000;
@@ -20,7 +21,19 @@ function requireDirectory(variable) {
 }
 
 export function stateDirectory() {
-  return requireDirectory("HERDR_PLUGIN_STATE_DIR");
+  const root = requireDirectory("HERDR_PLUGIN_STATE_DIR");
+  const socketPath = process.env.HERDR_SOCKET_PATH;
+  if (!socketPath) {
+    throw new Error("HERDR_SOCKET_PATH is required in the Herdr plugin runtime");
+  }
+
+  // Herdr object IDs are session-local, so every stateful artifact must be too.
+  const sessionKey = createHash("sha256")
+    .update(socketPath)
+    .digest("hex");
+  const directory = path.join(root, "sessions", sessionKey);
+  fs.mkdirSync(directory, { recursive: true });
+  return directory;
 }
 
 export function configDirectory() {
@@ -104,11 +117,29 @@ function positiveInteger(value, fallback) {
 }
 
 export function emptyState() {
-  return { version: 3, projects: {}, threads: {} };
+  return { version: STATE_VERSION, projects: {}, threads: {} };
 }
 
 export function loadState() {
   const statePath = path.join(stateDirectory(), "index.json");
+  return loadStatePath(statePath);
+}
+
+export function loadStateForSync() {
+  const currentPath = path.join(stateDirectory(), "index.json");
+  if (fs.existsSync(currentPath)) {
+    return loadStatePath(currentPath);
+  }
+
+  // Legacy state is migration input only; writes always stay session-scoped.
+  const legacyPath = path.join(
+    requireDirectory("HERDR_PLUGIN_STATE_DIR"),
+    "index.json",
+  );
+  return loadStatePath(legacyPath);
+}
+
+function loadStatePath(statePath) {
   if (!fs.existsSync(statePath)) {
     return emptyState();
   }
@@ -118,7 +149,7 @@ export function loadState() {
 
 function normalizeState(parsed) {
   return {
-    version: 3,
+    version: STATE_VERSION,
     projects:
       parsed.projects && typeof parsed.projects === "object"
         ? parsed.projects
@@ -327,6 +358,14 @@ export function normalizeCwd(cwd) {
     return null;
   }
   return path.resolve(cwd);
+}
+
+export function projectCwdToken(cwd) {
+  const normalized = normalizeCwd(cwd);
+  if (!normalized) {
+    throw new Error("project cwd is required");
+  }
+  return `sha256:${createHash("sha256").update(normalized).digest("hex")}`;
 }
 
 export function paneIdFromEvent() {
